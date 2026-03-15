@@ -1,7 +1,8 @@
 {
+  "/icon.svg/route": "app/icon.svg/route.js",
   "/(dashboard)/programs/page": "app/(dashboard)/programs/page.js",
-  "/(dashboard)/progress/page": "app/(dashboard)/progress/page.js",
   "/(dashboard)/programs/[id]/page": "app/(dashboard)/programs/[id]/page.js",
   "/(dashboard)/workout/page": "app/(dashboard)/workout/page.js",
+  "/(dashboard)/progress/page": "app/(dashboard)/progress/page.js",
   "/(dashboard)/metrics/page": "app/(dashboard)/metrics/page.js"
 }

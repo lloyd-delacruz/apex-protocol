@@ -768,6 +768,12 @@ h1, h2, h3, h4, h5, h6 {
 .ml-3{
   margin-left: 0.75rem;
 }
+.mt-2\.5{
+  margin-top: 0.625rem;
+}
+.ml-1\.5{
+  margin-left: 0.375rem;
+}
 .line-clamp-1{
   overflow: hidden;
   display: -webkit-box;
@@ -782,6 +788,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .block{
   display: block;
+}
+.inline{
+  display: inline;
 }
 .flex{
   display: flex;
@@ -1158,6 +1167,9 @@ h1, h2, h3, h4, h5, h6 {
 .rounded-modal{
   border-radius: 12px;
 }
+.rounded-\[5px\]{
+  border-radius: 5px;
+}
 .border{
   border-width: 1px;
 }
@@ -1236,6 +1248,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .border-white\/\[0\.05\]{
   border-color: rgb(255 255 255 / 0.05);
+}
+.border-accent\/30{
+  border-color: rgb(0 194 255 / 0.3);
+}
+.border-success\/30{
+  border-color: rgb(16 185 129 / 0.3);
 }
 .bg-accent{
   --tw-bg-opacity: 1;
@@ -1328,6 +1346,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 .bg-success\/\[0\.04\]{
   background-color: rgb(16 185 129 / 0.04);
+}
+.bg-accent\/\[0\.03\]{
+  background-color: rgb(0 194 255 / 0.03);
+}
+.bg-accent\/\[0\.06\]{
+  background-color: rgb(0 194 255 / 0.06);
+}
+.bg-background\/20{
+  background-color: rgb(10 10 15 / 0.2);
+}
+.bg-transparent{
+  background-color: transparent;
+}
+.bg-success\/\[0\.06\]{
+  background-color: rgb(16 185 129 / 0.06);
 }
 .bg-gradient-to-r{
   background-image: linear-gradient(to right, var(--tw-gradient-stops));
@@ -1528,11 +1561,18 @@ h1, h2, h3, h4, h5, h6 {
 .italic{
   font-style: italic;
 }
+.tabular-nums{
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction);
+}
 .leading-relaxed{
   line-height: 1.625;
 }
 .leading-tight{
   line-height: 1.25;
+}
+.leading-none{
+  line-height: 1;
 }
 .tracking-tight{
   letter-spacing: -0.025em;
@@ -1615,6 +1655,12 @@ h1, h2, h3, h4, h5, h6 {
 .opacity-60{
   opacity: 0.6;
 }
+.opacity-100{
+  opacity: 1;
+}
+.opacity-40{
+  opacity: 0.4;
+}
 .shadow-accent-sm{
   --tw-shadow: 0 0 12px rgba(0, 194, 255, 0.15);
   --tw-shadow-colored: 0 0 12px var(--tw-shadow-color);
@@ -1646,6 +1692,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 .transition-transform{
   transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.transition{
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.transition-opacity{
+  transition-property: opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
@@ -1732,6 +1788,18 @@ h1, h2, h3, h4, h5, h6 {
 
 .hover\:bg-white\/\[0\.04\]:hover{
   background-color: rgb(255 255 255 / 0.04);
+}
+
+.hover\:bg-accent\/\[0\.12\]:hover{
+  background-color: rgb(0 194 255 / 0.12);
+}
+
+.hover\:bg-accent\/\[0\.15\]:hover{
+  background-color: rgb(0 194 255 / 0.15);
+}
+
+.hover\:bg-success\/\[0\.12\]:hover{
+  background-color: rgb(16 185 129 / 0.12);
 }
 
 .hover\:text-accent:hover{

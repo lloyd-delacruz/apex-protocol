@@ -12,6 +12,7 @@ interface SetRowProps {
   repMin: number;
   repMax: number;
   weightUnit: 'kg' | 'lb';
+  isCurrentSet?: boolean;
   suggestedWeight?: number;
   onSetComplete: (data: {
     setNumber: number;
@@ -32,6 +33,7 @@ export default function SetRow({
   repMin,
   repMax,
   weightUnit,
+  isCurrentSet = false,
   suggestedWeight,
   onSetComplete,
   completed = false,
@@ -82,32 +84,36 @@ export default function SetRow({
         flex items-center gap-3 px-3 py-2.5 rounded-card border transition-colors duration-150
         ${completed
           ? 'bg-success/[0.04] border-success/[0.12]'
-          : 'bg-background border-white/[0.05] hover:border-white/[0.09]'
+          : isCurrentSet
+            ? 'bg-accent/[0.03] border-accent/20'
+            : 'bg-background border-white/[0.05] hover:border-white/[0.09]'
         }
       `}
     >
-      {/* Set label */}
-      <span className={`text-xs font-semibold w-20 flex-shrink-0 ${completed ? 'text-success/80' : 'text-text-muted'}`}>
-        {setLabel}
-      </span>
+      {/* Set label + rep target */}
+      <div className="w-20 flex-shrink-0">
+        <span className={`text-xs font-semibold block ${
+          completed ? 'text-success/80' : isCurrentSet ? 'text-accent' : 'text-text-muted'
+        }`}>
+          {setLabel}
+        </span>
+        <span className="text-[10px] text-text-muted leading-tight">
+          {repMin}–{repMax} reps
+        </span>
+      </div>
 
       {/* Weight input */}
       <div className="flex-1 min-w-0">
-        <div className="relative">
-          <input
-            type="number"
-            step="0.5"
-            min="0"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            placeholder="0"
-            disabled={completed}
-            className={inputClass}
-          />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-text-muted pointer-events-none">
-            {weightUnit}
-          </span>
-        </div>
+        <input
+          type="number"
+          step="0.5"
+          min="0"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          placeholder="0"
+          disabled={completed}
+          className={inputClass}
+        />
       </div>
 
       {/* Reps input */}
