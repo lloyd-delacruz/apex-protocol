@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import SetRow from '@/components/workout/SetRow';
@@ -69,23 +69,28 @@ function CircleTimer({
   secondsLeft,
   total,
   color,
+  size = 'md',
 }: {
   secondsLeft: number;
   total: number;
   color: string;
+  size?: 'md' | 'lg';
 }) {
-  const r = 26;
+  const r = size === 'lg' ? 34 : 26;
+  const sw = size === 'lg' ? 5 : 5;
+  const dim = size === 'lg' ? 80 : 64;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - Math.max(0, secondsLeft) / total);
+  const sizeClass = size === 'lg' ? 'w-20 h-20' : 'w-16 h-16';
   return (
-    <div className="relative w-16 h-16 flex-shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+    <div className={`relative ${sizeClass} flex-shrink-0`}>
+      <svg className="w-full h-full -rotate-90" viewBox={`0 0 ${dim} ${dim}`}>
+        <circle cx={dim/2} cy={dim/2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={sw} />
         <circle
-          cx="32" cy="32" r={r}
+          cx={dim/2} cy={dim/2} r={r}
           fill="none"
           stroke={color}
-          strokeWidth="5"
+          strokeWidth={sw}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={offset}
@@ -113,6 +118,8 @@ export default function WorkoutPage() {
   const [loggedSets, setLoggedSets] = useState<Record<string, LoggedSet[]>>({});
   const [weightUnits, setWeightUnits] = useState<Record<string, WeightUnit>>({});
   const [exerciseTimers, setExerciseTimers] = useState<Record<string, ExerciseTimerState>>({});
+  const [pausedTimers, setPausedTimers] = useState<Record<string, boolean>>({});
+  const pausedTimersRef = useRef<Record<string, boolean>>({});
   const [timerConfigs, setTimerConfigs] = useState<Record<string, TimerConfig>>({});
   const [initialWeights, setInitialWeights] = useState<Record<string, string>>({});
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -155,6 +162,7 @@ export default function WorkoutPage() {
         for (const id of Object.keys(next)) {
           const t = next[id];
           if (t.phase !== 'set' && t.phase !== 'rest') continue;
+          if (pausedTimersRef.current[id]) continue;
 
           if (t.secondsLeft > 1) {
             next[id] = { ...t, secondsLeft: t.secondsLeft - 1 };
@@ -190,11 +198,34 @@ export default function WorkoutPage() {
     setActiveExerciseIdx(0);
   }
 
+  function togglePause(id: string) {
+    const next = !pausedTimersRef.current[id];
+    pausedTimersRef.current[id] = next;
+    setPausedTimers((prev) => ({ ...prev, [id]: next }));
+  }
+
   function toggleUnit(prescriptionId: string) {
     setWeightUnits((prev) => ({
       ...prev,
       [prescriptionId]: prev[prescriptionId] === 'lb' ? 'kg' : 'lb',
     }));
+  }
+
+  function resetTimer(id: string) {
+    setExerciseTimers((prev) => {
+      const t = prev[id];
+      if (!t) return prev;
+      return {
+        ...prev,
+        [id]: {
+          ...t,
+          secondsLeft: t.phase === 'set' ? t.setDuration : t.restDuration
+        }
+      };
+    });
+    // Ensure it is unpaused when reset
+    pausedTimersRef.current[id] = false;
+    setPausedTimers((prev) => ({ ...prev, [id]: false }));
   }
 
   function getTimerDurations(id: string): { setDuration: number; restDuration: number } {
@@ -346,22 +377,22 @@ export default function WorkoutPage() {
               Start Workout
             </Button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {exercises.map((ex, idx) => (
-              <div key={ex.prescriptionId} className="flex items-center justify-between p-3 bg-background rounded-card border border-white/[0.04]">
-                <div className="flex items-center gap-3">
-                  <span className="w-7 h-7 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-text-muted">
+              <div key={ex.prescriptionId} className="flex items-center justify-between p-4 bg-background rounded-card border border-white/[0.04] transition-colors hover:bg-white/[0.02]">
+                <div className="flex items-center gap-4">
+                  <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center text-sm font-bold text-text-muted shadow-sm">
                     {idx + 1}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-text-primary">{ex.name}</p>
-                    <p className="text-xs text-text-muted">
+                    <p className="text-base font-bold text-text-primary tracking-tight">{ex.name}</p>
+                    <p className="text-sm font-medium text-text-muted mt-0.5">
                       {ex.setCount} sets · {ex.repMin}–{ex.repMax} reps
                     </p>
                   </div>
                 </div>
                 {ex.muscleGroup && (
-                  <span className="text-xs text-text-muted px-2 py-0.5 rounded bg-surface-elevated">
+                  <span className="text-sm font-medium text-text-muted px-3 py-1 rounded-md bg-surface-elevated">
                     {ex.muscleGroup}
                   </span>
                 )}
@@ -488,41 +519,78 @@ export default function WorkoutPage() {
             >
               {/* ── Exercise header ─────────────────────────────────────── */}
               <button
-                className="w-full flex items-center justify-between p-4 text-left"
+                className={`w-full flex items-center justify-between p-5 text-left transition-colors ${isActive ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
                 onClick={() => setActiveExerciseIdx(isActive ? -1 : exIdx)}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                    exerciseComplete ? 'bg-success text-white' : 'bg-surface-elevated text-text-muted'
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold shadow-sm ${
+                    exerciseComplete ? 'bg-success text-white shadow-success/20' : 'bg-surface-elevated text-text-muted'
                   }`}>
                     {exerciseComplete
-                      ? <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                      ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                       : exIdx + 1
                     }
                   </div>
                   <div>
-                    <p className="font-semibold text-text-primary text-sm">{exercise.name}</p>
-                    <p className="text-xs text-text-muted">
+                    <p className="font-bold text-text-primary text-lg tracking-tight">{exercise.name}</p>
+                    <p className="text-sm text-text-muted mt-0.5 font-medium">
                       {exercise.setCount} sets · {exercise.repMin}–{exercise.repMax} reps
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {/* Live timer badge when collapsed */}
                   {!isActive && timer && timer.phase === 'set' && (
-                    <span className="text-xs font-bold text-accent tabular-nums">{timer.secondsLeft}s</span>
+                    <span className="text-sm font-bold text-accent tabular-nums bg-accent/10 px-2.5 py-1 rounded-md">{timer.secondsLeft}s</span>
                   )}
                   {!isActive && timer && timer.phase === 'rest' && (
-                    <span className="text-xs font-bold text-success tabular-nums">REST {timer.secondsLeft}s</span>
+                    <span className="text-sm font-bold text-success tabular-nums bg-success/10 px-2.5 py-1 rounded-md">REST {timer.secondsLeft}s</span>
                   )}
-                  <span className="text-xs text-text-muted">{exerciseSets.length}/{exercise.setCount}</span>
-                  <svg
-                    className={`w-4 h-4 text-text-muted transition-transform ${isActive ? 'rotate-180' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  {/* Timer Controls — shown when timer is running or paused */}
+                  {isActive && (timer?.phase === 'set' || timer?.phase === 'rest') && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); resetTimer(exercise.prescriptionId); }}
+                        className="w-14 h-14 rounded-full border border-white/[0.12] bg-white/[0.04] text-text-muted hover:border-white/20 hover:text-text-primary flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm"
+                        title="Reset Timer"
+                      >
+                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); togglePause(exercise.prescriptionId); }}
+                        className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all duration-200 active:scale-95 ${
+                          pausedTimers[exercise.prescriptionId]
+                            ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 shadow-md shadow-accent/20'
+                            : 'border-white/[0.15] bg-white/[0.06] text-text-primary hover:border-white/30 hover:bg-white/[0.08] shadow-md'
+                        }`}
+                        title={pausedTimers[exercise.prescriptionId] ? 'Resume' : 'Pause'}
+                      >
+                        {pausedTimers[exercise.prescriptionId] ? (
+                          <svg className="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  <span className="text-sm font-semibold text-text-muted bg-surface-elevated px-2.5 py-1 rounded-md">
+                    {exerciseSets.length}/{exercise.setCount}
+                  </span>
+                  <div className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-white/5' : ''}`}>
+                    <svg
+                      className={`w-5 h-5 text-text-muted transition-transform duration-200 ${isActive ? 'rotate-180 text-text-primary' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
               </button>
 
@@ -656,26 +724,30 @@ export default function WorkoutPage() {
 
                     {/* set phase */}
                     {timer?.phase === 'set' && (
-                      <div className="flex items-center gap-4">
-                        <CircleTimer secondsLeft={timer.secondsLeft} total={timer.setDuration} color="#00C2FF" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-text-muted font-medium">
-                            Set {timer.currentSet} of {timer.totalSets}
-                          </p>
-                          <p className="text-2xl font-bold text-text-primary leading-tight mt-0.5">
-                            {exercise.repMin}–{exercise.repMax}
-                            <span className="text-sm font-medium text-text-muted ml-1.5">reps</span>
-                          </p>
-                          <p className="text-xs text-text-muted mt-1">
-                            {timer.setDuration >= 60
-                              ? `${Math.floor(timer.setDuration / 60)}m ${timer.setDuration % 60 > 0 ? `${timer.setDuration % 60}s` : ''}`.trim()
-                              : `${timer.setDuration}s`} max
-                          </p>
-                          <div className="mt-2 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-accent rounded-full"
-                              style={{ width: `${(timer.secondsLeft / timer.setDuration) * 100}%`, transition: 'width 0.95s linear' }}
-                            />
+                      <div className="py-2">
+                        <div className="flex items-center gap-6">
+                          <CircleTimer secondsLeft={timer.secondsLeft} total={timer.setDuration} color="#00C2FF" size="lg" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">
+                              SET {timer.currentSet} OF {timer.totalSets}
+                              {pausedTimers[exercise.prescriptionId] && (
+                                <span className="ml-2 text-accent/70">· PAUSED</span>
+                              )}
+                            </p>
+                            <p className="font-heading font-black leading-none text-5xl text-text-primary tracking-tight">
+                              {exercise.repMin}<span className="text-text-muted/40">–</span>{exercise.repMax}
+                            </p>
+                            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mt-1.5">reps</p>
+                            <div className="mt-3 h-[3px] bg-white/[0.06] rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${(timer.secondsLeft / timer.setDuration) * 100}%`,
+                                  transition: 'width 0.95s linear',
+                                  background: 'linear-gradient(90deg, #00C2FF, #818CF8)',
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -683,20 +755,34 @@ export default function WorkoutPage() {
 
                     {/* rest phase */}
                     {timer?.phase === 'rest' && (
-                      <div className="flex items-center gap-4">
-                        <CircleTimer secondsLeft={timer.secondsLeft} total={timer.restDuration} color="#10B981" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-success">Rest</p>
-                          <p className="text-xs text-text-muted mt-0.5">
-                            {timer.currentSet < timer.totalSets
-                              ? `Next: Set ${timer.currentSet + 1} of ${timer.totalSets}`
-                              : 'All sets done — log your reps when ready'}
-                          </p>
-                          <div className="mt-2.5 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-success rounded-full"
-                              style={{ width: `${(timer.secondsLeft / timer.restDuration) * 100}%`, transition: 'width 0.95s linear' }}
-                            />
+                      <div className="py-2">
+                        <div className="flex items-center gap-6">
+                          <CircleTimer secondsLeft={timer.secondsLeft} total={timer.restDuration} color="#10B981" size="lg" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">
+                              REST
+                              {pausedTimers[exercise.prescriptionId] && (
+                                <span className="ml-2 text-accent/70">· PAUSED</span>
+                              )}
+                            </p>
+                            <p className="font-heading font-black leading-none text-5xl text-success tracking-tight">
+                              {timer.secondsLeft}<span className="text-2xl font-semibold text-success/60 ml-1">s</span>
+                            </p>
+                            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mt-1.5">
+                              {timer.currentSet < timer.totalSets
+                                ? `Next · Set ${timer.currentSet + 1} of ${timer.totalSets}`
+                                : 'Last set done · Log reps below'}
+                            </p>
+                            <div className="mt-3 h-[3px] bg-white/[0.06] rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${(timer.secondsLeft / timer.restDuration) * 100}%`,
+                                  transition: 'width 0.95s linear',
+                                  background: 'linear-gradient(90deg, #10B981, #00C2FF)',
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
