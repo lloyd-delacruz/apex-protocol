@@ -13,45 +13,9 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { EXERCISE_LIBRARY, EXERCISE_SUBSTITUTIONS } from './exerciseLibrary';
 
 const prisma = new PrismaClient();
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function slug(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-// ─── Exercise definitions ─────────────────────────────────────────────────────
-
-const EXERCISES = [
-  // Compound — Upper
-  { name: 'Bench Press', category: 'compound', muscleGroup: 'Chest', equipment: 'barbell' },
-  { name: 'Weighted Pull-ups', category: 'compound', muscleGroup: 'Back', equipment: 'bodyweight' },
-  { name: 'Overhead Press', category: 'compound', muscleGroup: 'Shoulders', equipment: 'barbell' },
-  { name: 'Barbell Row', category: 'compound', muscleGroup: 'Back', equipment: 'barbell' },
-  { name: 'Incline DB Press', category: 'compound', muscleGroup: 'Chest', equipment: 'dumbbell' },
-  { name: 'Lat Pulldown', category: 'compound', muscleGroup: 'Back', equipment: 'cable' },
-  { name: 'DB Shoulder Press', category: 'compound', muscleGroup: 'Shoulders', equipment: 'dumbbell' },
-  { name: 'Cable Row', category: 'isolation', muscleGroup: 'Back', equipment: 'cable' },
-  { name: 'Fly Machine', category: 'isolation', muscleGroup: 'Chest', equipment: 'machine' },
-  { name: 'Lateral Raise', category: 'isolation', muscleGroup: 'Shoulders', equipment: 'dumbbell' },
-  // Compound — Lower
-  { name: 'Back Squat', category: 'compound', muscleGroup: 'Quads', equipment: 'barbell' },
-  { name: 'Romanian Deadlift', category: 'compound', muscleGroup: 'Hamstrings', equipment: 'barbell' },
-  { name: 'Deadlift', category: 'compound', muscleGroup: 'Full Body', equipment: 'barbell' },
-  { name: 'Leg Press', category: 'compound', muscleGroup: 'Quads', equipment: 'machine' },
-  { name: 'Hamstring Curl', category: 'isolation', muscleGroup: 'Hamstrings', equipment: 'machine' },
-  { name: 'Bulgarian Split Squat', category: 'compound', muscleGroup: 'Quads', equipment: 'dumbbell' },
-  { name: 'Hip Thrust', category: 'compound', muscleGroup: 'Glutes', equipment: 'barbell' },
-  { name: 'Leg Extension', category: 'isolation', muscleGroup: 'Quads', equipment: 'machine' },
-  { name: 'Seated Ham Curl', category: 'isolation', muscleGroup: 'Hamstrings', equipment: 'machine' },
-  { name: 'Calf Raise', category: 'isolation', muscleGroup: 'Calves', equipment: 'machine' },
-  // Cardio
-  { name: 'Zone 2 Cardio', category: 'cardio', muscleGroup: null, equipment: null },
-  { name: 'HIIT', category: 'cardio', muscleGroup: null, equipment: null },
-  { name: 'Walk + Stretch', category: 'cardio', muscleGroup: null, equipment: null },
-];
 
 // ─── Weekly workout template ──────────────────────────────────────────────────
 // Each week follows the same 7-day structure.
@@ -189,21 +153,50 @@ async function main() {
   const userRole = await prisma.role.findUnique({ where: { name: 'user' } });
   const adminRole = await prisma.role.findUnique({ where: { name: 'admin' } });
 
-  // 2. Exercises
-  console.log('  → Seeding exercises...');
-  await prisma.exercise.createMany({
-    data: EXERCISES.map((e) => ({
-      name: e.name,
-      category: e.category,
-      muscleGroup: e.muscleGroup,
-      equipment: e.equipment,
-    })),
-    skipDuplicates: true,
-  });
+  // 2. Exercises — upsert full library so existing records get enriched
+  console.log(`  → Seeding ${EXERCISE_LIBRARY.length} exercises...`);
+  for (const ex of EXERCISE_LIBRARY) {
+    const data = {
+      category: ex.category,
+      muscleGroup: ex.muscleGroup,
+      equipment: ex.equipment ?? null,
+      bodyPart: ex.bodyPart ?? null,
+      primaryMuscle: ex.primaryMuscle ?? null,
+      secondaryMuscles: ex.secondaryMuscles ?? [],
+      movementPattern: ex.movementPattern ?? null,
+      exerciseType: ex.exerciseType ?? null,
+      goalTags: ex.goalTags ?? [],
+      difficulty: ex.difficulty ?? null,
+      instructions: ex.instructions ?? null,
+      isCompound: ex.isCompound ?? false,
+      isUnilateral: ex.isUnilateral ?? false,
+    };
+    await prisma.exercise.upsert({
+      where: { name: ex.name },
+      create: { name: ex.name, ...data },
+      update: data,
+    });
+  }
 
   // Build exercise name → id map
   const allExercises = await prisma.exercise.findMany({ select: { id: true, name: true } });
   const exerciseMap = new Map(allExercises.map((e) => [e.name, e.id]));
+
+  // 2b. Substitutions
+  console.log('  → Seeding exercise substitutions...');
+  for (const sub of EXERCISE_SUBSTITUTIONS) {
+    const originalId = exerciseMap.get(sub.original);
+    if (!originalId) continue;
+    for (let i = 0; i < sub.substitutes.length; i++) {
+      const subId = exerciseMap.get(sub.substitutes[i]);
+      if (!subId) continue;
+      await prisma.exerciseSubstitution.upsert({
+        where: { exerciseId_substituteExerciseId: { exerciseId: originalId, substituteExerciseId: subId } },
+        create: { exerciseId: originalId, substituteExerciseId: subId, priorityRank: i + 1, notes: sub.notes ?? null },
+        update: { priorityRank: i + 1 },
+      });
+    }
+  }
 
   // 3. Program
   console.log('  → Seeding program...');
@@ -217,6 +210,11 @@ async function main() {
         'A structured 12-week strength and hypertrophy program. 4 training days per week with progressive overload built in. Suitable for intermediate lifters.',
       totalWeeks: 12,
       isActive: true,
+      isCustom: false,
+      sourceType: 'system',
+      goalType: 'strength,hypertrophy',
+      experienceLevel: 'intermediate',
+      daysPerWeek: 4,
     },
   });
 
@@ -317,11 +315,14 @@ async function main() {
     });
   }
 
+  const totalExercises = await prisma.exercise.count();
+  const totalSubs = await prisma.exerciseSubstitution.count();
   console.log('✅ Seed complete.');
   console.log('');
   console.log('  Dev account:  dev@apexprotocol.io / Password123!');
   console.log(`  Program:      ${program.name}`);
-  console.log(`  Exercises:    ${allExercises.length}`);
+  console.log(`  Exercises:    ${totalExercises}`);
+  console.log(`  Substitutions: ${totalSubs}`);
   console.log(`  Weeks:        12 (3 months × 4 weeks)`);
 }
 

@@ -172,6 +172,26 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ startDate }),
       }),
+
+    assignGenerated: (id: string) =>
+      request<unknown>(`/api/programs/generated/${id}/assign`, {
+        method: 'POST',
+      }),
+
+    generate: (params: { goals: string[]; experienceLevel: string; daysPerWeek: number; equipment: string[]; compoundPreference?: 'compound' | 'mixed' | 'isolation' }) =>
+      request<{ program: ApiProgramFull }>('/api/programs/generate', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+
+    delete: (id: string) =>
+      request<null>(`/api/programs/${id}`, { method: 'DELETE' }),
+
+    updatePrescription: (programId: string, prescriptionId: string, exerciseId: string) =>
+      request<{ prescription: ApiExercisePrescription }>(
+        `/api/programs/${programId}/prescriptions/${prescriptionId}`,
+        { method: 'PATCH', body: JSON.stringify({ exerciseId }) }
+      ),
   },
 
   // ─── Workouts ─────────────────────────────────────────────────────────────
@@ -239,6 +259,74 @@ export const api = {
     dashboard: () =>
       request<ApiAnalyticsDashboard>('/api/analytics/dashboard'),
   },
+
+  // ─── Exercises ────────────────────────────────────────────────────────────
+
+  exercises: {
+    list: (params?: ExerciseFilterParams) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return request<{ exercises: ApiExercise[]; total: number }>(`/api/exercises${qs}`);
+    },
+
+    get: (id: string) =>
+      request<{ exercise: ApiExerciseDetail }>(`/api/exercises/${id}`),
+
+    search: (q: string) =>
+      request<{ exercises: ApiExercise[] }>(`/api/exercises/search?q=${encodeURIComponent(q)}`),
+
+    filter: (params: ExerciseFilterParams) => {
+      const qs = '?' + new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString();
+      return request<{ exercises: ApiExercise[]; total: number }>(`/api/exercises/filter${qs}`);
+    },
+
+    byGoal: (goal: string) =>
+      request<{ exercises: ApiExercise[] }>(`/api/exercises/by-goal/${encodeURIComponent(goal)}`),
+
+    byEquipment: (equipment: string) =>
+      request<{ exercises: ApiExercise[] }>(`/api/exercises/by-equipment/${encodeURIComponent(equipment)}`),
+
+    byPattern: (pattern: string) =>
+      request<{ exercises: ApiExercise[] }>(`/api/exercises/by-pattern/${encodeURIComponent(pattern)}`),
+
+    substitutions: (id: string) =>
+      request<{ substitutions: ApiExerciseSubstitutionDetail[] }>(`/api/exercises/${id}/substitutions`),
+
+    taxonomy: () =>
+      request<ApiExerciseTaxonomy>('/api/exercises/taxonomy'),
+  },
+
+  // ─── Progression ──────────────────────────────────────────────────────────
+
+  progression: {
+    pending: () =>
+      request<{ progressions: ApiPendingProgression[] }>('/api/progression/pending'),
+
+    confirm: (params: { trainingLogId: string; exerciseId: string; currentWeight: number; incrementPct: number; weightUnit: 'kg' | 'lb' }) =>
+      request<{ newWeight: number; weightUnit: string }>('/api/progression/confirm', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+
+    dismiss: (trainingLogId: string) =>
+      request<null>('/api/progression/dismiss', {
+        method: 'POST',
+        body: JSON.stringify({ trainingLogId }),
+      }),
+
+    suggestedWeights: (exerciseIds: string[]) =>
+      request<{ weights: Record<string, { suggestedWeight: number; weightUnit: string; preferredIncrementPct: number }> }>(
+        '/api/progression/suggested-weights',
+        { method: 'POST', body: JSON.stringify({ exerciseIds }) }
+      ),
+  },
 };
 
 export default api;
@@ -252,7 +340,12 @@ export interface ApiProgram {
   description: string | null;
   totalWeeks: number;
   isActive: boolean;
+  isCustom?: boolean;
   createdAt: string;
+  goalType?: string;
+  trainingFocus?: string;
+  experienceLevel?: string;
+  daysPerWeek?: number;
 }
 
 export interface ApiProgramFull extends ApiProgram {
@@ -298,9 +391,58 @@ export interface ApiExercisePrescription {
 export interface ApiExercise {
   id: string;
   name: string;
+  // Legacy fields
   category: string | null;
   muscleGroup: string | null;
   equipment: string | null;
+  // Media
+  mediaUrl?: string | null;
+  // Enriched taxonomy
+  bodyPart?: string | null;
+  primaryMuscle?: string | null;
+  secondaryMuscles?: string[] | null;
+  movementPattern?: string | null;
+  exerciseType?: string | null;
+  goalTags?: string[] | null;
+  difficulty?: string | null;
+  instructions?: string | null;
+  isCompound?: boolean;
+  isUnilateral?: boolean;
+}
+
+export interface ApiExerciseSubstitutionDetail {
+  id: string;
+  priorityRank: number;
+  notes: string | null;
+  substituteExercise: ApiExercise;
+}
+
+export interface ApiExerciseDetail extends ApiExercise {
+  substitutions: ApiExerciseSubstitutionDetail[];
+}
+
+export interface ApiExerciseTaxonomy {
+  equipment: string[];
+  movementPatterns: string[];
+  bodyParts: string[];
+  exerciseTypes: string[];
+  difficulties: string[];
+}
+
+export interface ExerciseFilterParams {
+  search?: string;
+  goal?: string;
+  equipment?: string;
+  movementPattern?: string;
+  bodyPart?: string;
+  primaryMuscle?: string;
+  muscleGroup?: string;
+  exerciseType?: string;
+  difficulty?: string;
+  isCompound?: boolean;
+  isUnilateral?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export interface ApiTodayWorkout {
@@ -375,6 +517,16 @@ export interface ApiAnalyticsDashboard {
     failed: number;
     total: number;
   };
+}
+
+export interface ApiPendingProgression {
+  trainingLogId: string;
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: string | null;
+  sessionDate: string;
+  achievedWeight: number | null;
+  weightUnit: string;
 }
 
 // ─── Request input types ──────────────────────────────────────────────────────

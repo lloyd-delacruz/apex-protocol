@@ -357,6 +357,113 @@ To override the API URL for staging/production, set `NEXT_PUBLIC_API_URL` in you
 
 ---
 
+# Exercise Library
+
+Apex Protocol includes a curated exercise library of 500+ exercises sourced from the **RapidAPI ExerciseDB** API, enriched with taxonomy metadata via an automated classification pipeline.
+
+## RapidAPI Integration
+
+Exercise data is fetched from ExerciseDB via [RapidAPI](https://rapidapi.com/justin-WFnsXH_t6/api/exercisedb).
+
+The integration uses:
+- `ExerciseDbService` — HTTP client for the API (no database writes)
+- `ExerciseImportService` — normalises and persists exercises with deduplication
+- `ExerciseClassificationService` — assigns taxonomy via heuristic pipeline
+
+## Required Environment Variables
+
+Set these in `backend/.env` before running import commands:
+
+| Variable | Description |
+|----------|-------------|
+| `EXERCISEDB_API_KEY` | Your RapidAPI API key |
+| `EXERCISEDB_API_HOST` | API host — `exercisedb.p.rapidapi.com` |
+| `EXERCISEDB_BASE_URL` | Base URL — `https://exercisedb.p.rapidapi.com` |
+
+Example `backend/.env`:
+```
+EXERCISEDB_API_KEY=your_rapidapi_key_here
+EXERCISEDB_API_HOST=exercisedb.p.rapidapi.com
+EXERCISEDB_BASE_URL=https://exercisedb.p.rapidapi.com
+```
+
+## Import Commands
+
+Run these from the `backend/` directory:
+
+```bash
+# Import the full exercise library (~1300 exercises, paginated)
+npm run exercises:import
+
+# Or run directly with ts-node
+npx ts-node-dev --transpile-only src/scripts/importExercises.ts
+```
+
+The import script is safe to re-run. It uses a three-tier deduplication strategy:
+1. Match by `(externalId, externalSource)` — exact re-sync of previously imported exercise
+2. Match by name — enrich an existing hand-authored exercise with media/metadata
+3. No match — create new exercise record
+
+## Importing a Subset
+
+The `ExerciseImportService` supports targeted imports:
+
+```typescript
+// Import exercises by body part (e.g. for testing)
+await ExerciseImportService.importByBodyPart('chest');
+
+// Import exercises by equipment type
+await ExerciseImportService.importByEquipment('barbell');
+```
+
+## Exercise Taxonomy Fields
+
+Each exercise is automatically classified with these enriched fields:
+
+| Field | Values | Description |
+|-------|--------|-------------|
+| `movementPattern` | squat, hinge, lunge_single_leg, horizontal_push, vertical_push, horizontal_pull, vertical_pull, rotation, anti_rotation, carry, cardio, mobility | Primary movement classification |
+| `exerciseType` | compound, isolation, cardio, core, mobility, plyometric | Exercise category |
+| `difficulty` | beginner, intermediate, advanced | Difficulty tier |
+| `bodyPart` | Upper Body, Lower Body, Core, Full Body, Cardio | Body region |
+| `primaryMuscle` | e.g. Quadriceps, Pectorals, Latissimus Dorsi | Primary target muscle |
+| `secondaryMuscles` | JSON array of strings | Secondary muscles involved |
+| `goalTags` | strength, hypertrophy, fat_loss, endurance, athletic_performance, general_fitness, mobility_recovery | Training goal tags |
+| `isCompound` | true / false | Multi-joint movement flag |
+| `isUnilateral` | true / false | Single-limb movement flag |
+| `equipment` | barbell, dumbbell, cable, machine, kettlebell, band, bodyweight, cardio_machine, mixed, none | Equipment required |
+
+## Exercise API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/exercises` | List all exercises (paginated, filterable) |
+| GET | `/api/exercises/search?q=` | Full-text name search |
+| GET | `/api/exercises/filter` | Multi-field filtering |
+| GET | `/api/exercises/taxonomy` | Distinct values for all filter fields |
+| GET | `/api/exercises/by-goal/:goal` | Filter by training goal |
+| GET | `/api/exercises/by-equipment/:equipment` | Filter by equipment |
+| GET | `/api/exercises/by-pattern/:pattern` | Filter by movement pattern |
+| GET | `/api/exercises/:id` | Single exercise with substitutions |
+| GET | `/api/exercises/:id/substitutions` | Substitution options only |
+
+### Supported Query Parameters for `/api/exercises` and `/api/exercises/filter`
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| `search` | `?search=squat` | Name search (case-insensitive) |
+| `goal` | `?goal=strength` | Filter by goal tag |
+| `equipment` | `?equipment=barbell` | Filter by equipment |
+| `movementPattern` | `?movementPattern=hinge` | Filter by movement pattern |
+| `bodyPart` | `?bodyPart=Lower+Body` | Filter by body region |
+| `difficulty` | `?difficulty=beginner` | Filter by difficulty |
+| `isCompound` | `?isCompound=true` | Compound-only filter |
+| `isUnilateral` | `?isUnilateral=true` | Unilateral-only filter |
+| `limit` | `?limit=20` | Page size (default 50, max 200) |
+| `offset` | `?offset=40` | Pagination offset |
+
+---
+
 # License
 
 MIT License

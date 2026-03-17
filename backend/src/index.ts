@@ -8,6 +8,9 @@ import workoutsRouter from './routes/workouts';
 import trainingLogRouter from './routes/trainingLog';
 import metricsRouter from './routes/metrics';
 import analyticsRouter from './routes/analytics';
+import progressionRouter from './routes/progression';
+import exercisesRouter from './routes/exercises';
+import adminRouter from './routes/admin';
 
 const app = express();
 
@@ -44,6 +47,9 @@ app.use('/api/workouts', workoutsRouter);
 app.use('/api/training-log', trainingLogRouter);
 app.use('/api/metrics', metricsRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/progression', progressionRouter);
+app.use('/api/exercises', exercisesRouter);
+app.use('/api/admin', adminRouter);
 
 // Legacy route aliases (backward compat with existing frontend)
 app.use('/auth', authLimiter, authRouter);

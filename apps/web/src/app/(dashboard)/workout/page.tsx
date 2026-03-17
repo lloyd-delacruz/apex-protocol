@@ -7,7 +7,10 @@ import SetRow from '@/components/workout/SetRow';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { TrainingStatus } from '@apex/shared';
 import { summarizeSetStatuses } from '@/lib/progression';
-import api, { ApiTodayWorkout, ApiExercisePrescription } from '@/lib/api';
+import api, { ApiTodayWorkout, ApiExercisePrescription, ApiPendingProgression, ApiExercise } from '@/lib/api';
+import ProgressionPromptBanner from '@/components/workout/ProgressionPromptBanner';
+import ExerciseMetaBadges from '@/components/ui/ExerciseMetaBadges';
+import ExercisePreviewModal from '@/components/ui/ExercisePreviewModal';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SET_DURATION = 45;
@@ -29,6 +32,12 @@ interface WorkoutExercise {
   setCount: number;
   repMin: number;
   repMax: number;
+  // Enriched metadata
+  equipment?: string | null;
+  bodyPart?: string | null;
+  primaryMuscle?: string | null;
+  movementPattern?: string | null;
+  difficulty?: string | null;
 }
 
 interface ExerciseTimerState {
@@ -61,6 +70,11 @@ function parsePrescription(ep: ApiExercisePrescription): WorkoutExercise {
     setCount: 3,
     repMin: parts[0] ?? 8,
     repMax: parts[1] ?? parts[0] ?? 12,
+    equipment: ep.exercise.equipment,
+    bodyPart: ep.exercise.bodyPart,
+    primaryMuscle: ep.exercise.primaryMuscle,
+    movementPattern: ep.exercise.movementPattern,
+    difficulty: ep.exercise.difficulty,
   };
 }
 
@@ -125,18 +139,56 @@ export default function WorkoutPage() {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [notes, setNotes] = useState('');
+  const [pendingProgressions, setPendingProgressions] = useState<ApiPendingProgression[]>([]);
+  const [previewExercise, setPreviewExercise] = useState<ApiExercise | null>(null);
+  // exerciseId → suggestedWeight (confirmed working weight)
+  const [suggestedWeights, setSuggestedWeights] = useState<Record<string, number>>({});
+  const [suggestedWeightUnits, setSuggestedWeightUnits] = useState<Record<string, string>>({});
 
-  // Load today's workout
+  // Load today's workout + pending progressions
   useEffect(() => {
     api.workouts.today()
       .then((w) => {
         setTodayWorkout(w);
         if (w?.workoutDay?.exercisePrescriptions) {
-          setExercises(w.workoutDay.exercisePrescriptions.map(parsePrescription));
+          const parsed = w.workoutDay.exercisePrescriptions.map(parsePrescription);
+          setExercises(parsed);
+
+          // Batch fetch suggested weights for exercises in today's workout
+          const exerciseIds = parsed.map((e) => e.exerciseId);
+          if (exerciseIds.length > 0) {
+            api.progression.suggestedWeights(exerciseIds)
+              .then(({ weights }) => {
+                const wMap: Record<string, number> = {};
+                const uMap: Record<string, string> = {};
+                for (const [exId, val] of Object.entries(weights)) {
+                  wMap[exId] = val.suggestedWeight;
+                  uMap[exId] = val.weightUnit;
+                }
+                setSuggestedWeights(wMap);
+                setSuggestedWeightUnits(uMap);
+                // Pre-fill initialWeights from suggestions (don't override user-entered values)
+                setInitialWeights((prev) => {
+                  const next = { ...prev };
+                  for (const ex of parsed) {
+                    if (!next[ex.prescriptionId] && wMap[ex.exerciseId] != null) {
+                      next[ex.prescriptionId] = String(wMap[ex.exerciseId]);
+                    }
+                  }
+                  return next;
+                });
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Fetch pending progressions independently
+    api.progression.pending()
+      .then(({ progressions }) => setPendingProgressions(progressions))
+      .catch(() => {});
   }, []);
 
   // Global session timer
@@ -362,6 +414,15 @@ export default function WorkoutPage() {
             {dayName}{weekNumber ? ` · Week ${weekNumber}` : ''}
           </p>
         </div>
+
+        {/* Progression prompts — shown when exercises from any recent session were achieved */}
+        {pendingProgressions.length > 0 && (
+          <ProgressionPromptBanner
+            progressions={pendingProgressions}
+            onUpdate={setPendingProgressions}
+          />
+        )}
+
         <Card elevated className="p-6">
           <div className="flex items-start justify-between mb-5">
             <div>
@@ -378,26 +439,35 @@ export default function WorkoutPage() {
             </Button>
           </div>
           <div className="space-y-3">
-            {exercises.map((ex, idx) => (
-              <div key={ex.prescriptionId} className="flex items-center justify-between p-4 bg-background rounded-card border border-white/[0.04] transition-colors hover:bg-white/[0.02]">
-                <div className="flex items-center gap-4">
-                  <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center text-sm font-bold text-text-muted shadow-sm">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <p className="text-base font-bold text-text-primary tracking-tight">{ex.name}</p>
-                    <p className="text-sm font-medium text-text-muted mt-0.5">
-                      {ex.setCount} sets · {ex.repMin}–{ex.repMax} reps
-                    </p>
+            {exercises.map((ex, idx) => {
+              const suggested = suggestedWeights[ex.exerciseId];
+              const suggestedUnit = suggestedWeightUnits[ex.exerciseId];
+              return (
+                <div key={ex.prescriptionId} className="flex items-center justify-between p-4 bg-background rounded-card border border-white/[0.04] transition-colors hover:bg-white/[0.02]">
+                  <div className="flex items-center gap-4">
+                    <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center text-sm font-bold text-text-muted shadow-sm">
+                      {idx + 1}
+                    </span>
+                    <div>
+                      <p className="text-base font-bold text-text-primary tracking-tight">{ex.name}</p>
+                      <p className="text-sm font-medium text-text-muted mt-0.5">
+                        {ex.setCount} sets · {ex.repMin}–{ex.repMax} reps
+                        {suggested != null && (
+                          <span className="ml-2 text-accent font-semibold">
+                            · {suggested}{suggestedUnit ?? 'kg'}
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
+                  {ex.muscleGroup && (
+                    <span className="text-sm font-medium text-text-muted px-3 py-1 rounded-md bg-surface-elevated">
+                      {ex.muscleGroup}
+                    </span>
+                  )}
                 </div>
-                {ex.muscleGroup && (
-                  <span className="text-sm font-medium text-text-muted px-3 py-1 rounded-md bg-surface-elevated">
-                    {ex.muscleGroup}
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       </div>
@@ -467,6 +537,13 @@ export default function WorkoutPage() {
   return (
     <div className="space-y-4">
 
+      {previewExercise && (
+        <ExercisePreviewModal
+          exercise={previewExercise}
+          onClose={() => setPreviewExercise(null)}
+        />
+      )}
+
       {/* Session header */}
       <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-sm pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between">
@@ -532,10 +609,28 @@ export default function WorkoutPage() {
                     }
                   </div>
                   <div>
-                    <p className="font-bold text-text-primary text-lg tracking-tight">{exercise.name}</p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const ep = todayWorkout?.workoutDay?.exercisePrescriptions?.find(
+                          (p) => p.id === exercise.prescriptionId
+                        );
+                        if (ep?.exercise) setPreviewExercise(ep.exercise);
+                      }}
+                      className="text-left group/name"
+                    >
+                      <p className="font-bold text-text-primary text-lg tracking-tight group-hover/name:text-accent transition-colors">
+                        {exercise.name}
+                      </p>
+                    </button>
                     <p className="text-sm text-text-muted mt-0.5 font-medium">
                       {exercise.setCount} sets · {exercise.repMin}–{exercise.repMax} reps
                     </p>
+                    <ExerciseMetaBadges
+                      exercise={exercise}
+                      fields={['equipment', 'bodyPart', 'movementPattern']}
+                      className="mt-1.5"
+                    />
                   </div>
                 </div>
 

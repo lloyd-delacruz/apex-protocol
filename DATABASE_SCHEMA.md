@@ -184,17 +184,101 @@ index on sort_order
 
 8. exercises
 
-Stores the exercise library.
+Stores the exercise library — both hand-authored exercises and exercises imported from ExerciseDB via RapidAPI.
+
+### Legacy Fields (backward compatibility)
 
 Column	Type	Constraints	Description
 id	UUID	PK	Unique exercise identifier
 name	VARCHAR(255)	UNIQUE, NOT NULL	Exercise name
-category	VARCHAR(100)	NULL	compound, isolation, cardio, etc.
-muscle_group	VARCHAR(100)	NULL	Main target muscle
-equipment	VARCHAR(100)	NULL	barbell, dumbbell, machine, etc.
-is_active	BOOLEAN	DEFAULT true	Active exercise flag
+category	VARCHAR(100)	NULL	Legacy: compound, isolation, cardio
+muscle_group	VARCHAR(100)	NULL	Legacy: main target muscle
+equipment	VARCHAR(100)	NULL	barbell, dumbbell, cable, machine, kettlebell, band, bodyweight, cardio_machine, mixed, none
+is_active	BOOLEAN	DEFAULT true	Active flag
+deleted_at	TIMESTAMP	NULL	Soft-delete timestamp
 created_at	TIMESTAMP	NOT NULL	Created timestamp
 updated_at	TIMESTAMP	NOT NULL	Updated timestamp
+
+### Enriched Taxonomy Fields
+
+These fields are populated automatically by the classification pipeline during import.
+
+Column	Type	Constraints	Description
+body_part	VARCHAR(100)	NULL	Upper Body, Lower Body, Core, Full Body, Cardio, Mobility
+primary_muscle	VARCHAR(100)	NULL	Primary target muscle (title case), e.g. Quadriceps
+secondary_muscles	JSONB	NULL	Array of secondary muscle strings
+movement_pattern	VARCHAR(100)	NULL	See Movement Pattern Values below
+exercise_type	VARCHAR(100)	NULL	compound, isolation, cardio, core, mobility, plyometric, rehab
+goal_tags	JSONB	NULL	Array of goal strings — strength, hypertrophy, fat_loss, endurance, athletic_performance, general_fitness, mobility_recovery
+difficulty	VARCHAR(50)	NULL	beginner, intermediate, advanced
+is_compound	BOOLEAN	NULL	True for multi-joint movements
+is_unilateral	BOOLEAN	NULL	True for single-limb movements
+
+### Media and Content Fields
+
+Column	Type	Constraints	Description
+media_url	TEXT	NULL	GIF or image URL from ExerciseDB
+video_url	TEXT	NULL	Optional video URL
+instructions	TEXT	NULL	Numbered step-by-step instructions (stored as plain text)
+
+### External Source Fields (deduplication)
+
+Column	Type	Constraints	Description
+external_id	VARCHAR(255)	NULL	ID from the external data source (e.g. ExerciseDB exercise ID)
+external_source	VARCHAR(100)	NULL	Source name, e.g. "exercisedb"
+last_synced_at	TIMESTAMP	NULL	Last time this record was refreshed from the external source
+
+Unique Constraint
+
+(external_id, external_source) — prevents duplicate imports from the same source
+
+### Indexes
+
+index on movement_pattern
+index on exercise_type
+index on difficulty
+index on external_source
+index on is_active
+index on (external_id, external_source) — unique
+
+### Movement Pattern Values
+
+| Value | Description |
+|-------|-------------|
+| `squat` | Knee-dominant lower body (squats, leg press, hack squat) |
+| `hinge` | Hip-dominant lower body (deadlift, RDL, hip thrust, leg curl) |
+| `lunge_single_leg` | Unilateral lower body (lunge, split squat, step-up) |
+| `horizontal_push` | Pressing movements parallel to torso (bench press, push-up, dip, chest fly) |
+| `vertical_push` | Pressing movements perpendicular to torso (OHP, lateral raise, shrug) |
+| `horizontal_pull` | Pulling movements parallel to torso (row, face pull, bicep curl) |
+| `vertical_pull` | Pulling movements perpendicular to torso (pull-up, lat pulldown) |
+| `rotation` | Rotational core movements (Russian twist, wood chop) |
+| `anti_rotation` | Core stability movements (plank, dead bug, bird dog, Pallof press) |
+| `carry` | Loaded carrying patterns (farmer's walk, suitcase carry) |
+| `cardio` | Cardiovascular conditioning (running, cycling, rowing, burpees) |
+| `mobility` | Flexibility and mobility work (stretches, foam rolling) |
+| `balance` | Balance and stability training |
+
+### Classification Pipeline
+
+Classification is performed by `ExerciseClassificationService` using a heuristic pipeline:
+
+1. Name-based keyword matching — primary signal (150+ pattern rules)
+2. rawBodyPart + rawTarget fallback — used when name matching fails
+3. Safe defaults — applied when no signal is available
+
+The classification runs during import and assigns all enriched taxonomy fields automatically. Hand-authored exercises preserve their existing taxonomy when enriched.
+
+### isEnriched Flag
+
+The `isEnriched` flag is a computed boolean returned by the API (not stored in DB):
+
+```
+isEnriched = (external_source IS NOT NULL AND last_synced_at IS NOT NULL)
+```
+
+This indicates whether the exercise was imported from an external source.
+
 9. exercise_substitutions
 
 Stores possible substitute exercises.

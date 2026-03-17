@@ -42,6 +42,8 @@ model User {
   bodyMetrics            BodyMetric[]
   trainingLogs           TrainingLog[]
   userProgramAssignments UserProgramAssignment[]
+  createdPrograms        Program[]               @relation("CreatedPrograms")
+  exerciseWeights        UserExerciseWeight[]
 
   @@index([roleId])
   @@map("users")
@@ -71,15 +73,26 @@ model Program {
   name        String    @db.VarChar(255)
   slug        String    @unique @db.VarChar(255)
   description String?
+  // Core metadata
   totalWeeks  Int       @map("total_weeks")
   isActive    Boolean   @default(true) @map("is_active")
   deletedAt   DateTime? @map("deleted_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  // Generation specific metadata
+  isCustom        Boolean   @default(false) @map("is_custom") // True if generated or custom-built, False if global template
+  authorId        String?   @map("author_id") // Who created this program
+  goalType        String?   @map("goal_type") @db.VarChar(50) // e.g. 'strength', 'hypertrophy'
+  experienceLevel String?   @map("experience_level") @db.VarChar(50) // e.g. 'beginner', 'intermediate'
+  daysPerWeek     Int?      @map("days_per_week")
+  equipmentList   String[]  @map("equipment_list") // e.g. ['barbell', 'dumbbell']
+  sourceType      String    @default("system") @map("source_type") @db.VarChar(50) // 'system', 'ai_generator', 'coach'
+
   programMonths          ProgramMonth[]
   userProgramAssignments UserProgramAssignment[]
   trainingLogs           TrainingLog[]
+  author                 User?                   @relation("CreatedPrograms", fields: [authorId], references: [id])
 
   @@map("programs")
 }
@@ -145,21 +158,46 @@ model WorkoutDay {
 // ─── Exercises ────────────────────────────────────────────────────────────────
 
 model Exercise {
-  id          String    @id @default(uuid())
-  name        String    @unique @db.VarChar(255)
-  category    String?   @db.VarChar(100)
-  muscleGroup String?   @map("muscle_group") @db.VarChar(100)
-  equipment   String?   @db.VarChar(100)
-  isActive    Boolean   @default(true) @map("is_active")
-  deletedAt   DateTime? @map("deleted_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  name             String    @unique @db.VarChar(255)
+  // Legacy fields (kept for backward compatibility with existing program/workout flow)
+  category         String?   @db.VarChar(100)
+  muscleGroup      String?   @map("muscle_group") @db.VarChar(100)
+  equipment        String?   @db.VarChar(100)
+  // Extended taxonomy
+  bodyPart         String?   @map("body_part") @db.VarChar(100)
+  primaryMuscle    String?   @map("primary_muscle") @db.VarChar(100)
+  secondaryMuscles Json?     @map("secondary_muscles") // String[]
+  movementPattern  String?   @map("movement_pattern") @db.VarChar(100)
+  exerciseType     String?   @map("exercise_type") @db.VarChar(50)
+  goalTags         Json?     @map("goal_tags") // String[]
+  difficulty       String?   @db.VarChar(50)
+  instructions     String?
+  mediaUrl         String?   @map("media_url") @db.VarChar(500)
+  videoUrl         String?   @map("video_url") @db.VarChar(500)
+  isCompound       Boolean   @default(false) @map("is_compound")
+  isUnilateral     Boolean   @default(false) @map("is_unilateral")
+  // External data source tracking
+  externalId       String?   @map("external_id") @db.VarChar(255)   // ID from the external source (e.g. ExerciseDB "0001")
+  externalSource   String?   @map("external_source") @db.VarChar(100) // e.g. "exercisedb" | "local"
+  lastSyncedAt     DateTime? @map("last_synced_at")                  // When this record was last synced from the external source
+  // Status
+  isActive         Boolean   @default(true) @map("is_active")
+  deletedAt        DateTime? @map("deleted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   exercisePrescriptions     ExercisePrescription[]
   substitutionsAsOriginal   ExerciseSubstitution[] @relation("OriginalExercise")
   substitutionsAsSubstitute ExerciseSubstitution[] @relation("SubstituteExercise")
   trainingLogs              TrainingLog[]
+  userExerciseWeights       UserExerciseWeight[]
 
+  @@unique([externalId, externalSource]) // Prevents duplicate imports; NULL values are distinct in PostgreSQL so existing rows are unaffected
+  @@index([movementPattern])
+  @@index([exerciseType])
+  @@index([difficulty])
+  @@index([externalSource])
   @@map("exercises")
 }
 
@@ -249,6 +287,7 @@ model TrainingLog {
   readyToIncrease        Boolean?  @map("ready_to_increase")
   nextWeight             Decimal?  @map("next_weight") @db.Decimal(8, 2)
   status                 String?   @db.VarChar(20)
+  progressionConfirmed   Boolean   @default(false) @map("progression_confirmed")
   notes                  String?
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
@@ -294,4 +333,27 @@ model BodyMetric {
   @@index([userId])
   @@index([entryDate])
   @@map("body_metrics")
+}
+
+// ─── User Exercise Weights ────────────────────────────────────────────────────
+// Stores the confirmed working weight per user per exercise, updated each time
+// the user confirms a progression. Used as suggested weight on the workout page.
+
+model UserExerciseWeight {
+  id                   String   @id @default(uuid())
+  userId               String   @map("user_id")
+  exerciseId           String   @map("exercise_id")
+  currentWeight        Decimal  @map("current_weight") @db.Decimal(8, 2)
+  weightUnit           String   @default("kg") @map("weight_unit") @db.VarChar(20)
+  preferredIncrementPct Float   @default(2.5) @map("preferred_increment_pct") @db.DoublePrecision
+  confirmedAt          DateTime @default(now()) @map("confirmed_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@unique([userId, exerciseId])
+  @@index([userId])
+  @@map("user_exercise_weights")
 }
