@@ -9,7 +9,9 @@
  *
  * Deduplication strategy (in priority order):
  *   1. Match on (externalId, externalSource="exercisedb")  — exact re-import.
- *   2. Match on name (case-insensitive)                    — enrich local exercise.
+ *   2a. Match on name (case-insensitive exact)             — enrich local exercise.
+ *   2b. Partial name match: external name contains DB name — backfill seeded exercises
+ *       (e.g. DB "Bench Press" matched by ExerciseDB "barbell bench press").
  *   3. No match                                            — create new record.
  *
  * When enriching a LOCAL exercise (strategy 2), only the sync-metadata and
@@ -192,8 +194,10 @@ function normaliseExercise(raw: ExerciseDbExercise): NormalisedExercise {
  *
  * Strategy:
  *   1. Find by (externalId, externalSource) → full update (re-sync from API).
- *   2. Find by name                         → enrich with sync metadata only,
+ *   2. Find by name (exact, then partial)   → enrich with sync metadata only,
  *                                             preserving hand-authored taxonomy.
+ *                                             Partial match handles seeded exercises
+ *                                             whose names are substrings of ExerciseDB names.
  *   3. No match                             → create new record.
  */
 async function upsertExercise(raw: ExerciseDbExercise): Promise<ExerciseOutcome> {
@@ -230,9 +234,31 @@ async function upsertExercise(raw: ExerciseDbExercise): Promise<ExerciseOutcome>
   }
 
   // ── Strategy 2: existing hand-authored exercise with same name ────────────
-  const byName = await prisma.exercise.findFirst({
+  // First try exact match (case-insensitive), then try partial match:
+  // e.g. DB has "Bench Press", ExerciseDB has "barbell bench press" — the
+  // seeded name is contained within the external name.
+  let byName = await prisma.exercise.findFirst({
     where: { name: { equals: data.name, mode: 'insensitive' } },
   });
+
+  if (!byName) {
+    // Partial match: find a DB exercise whose name appears inside the ExerciseDB name.
+    // Uses raw SQL because Prisma can't invert the LIKE direction (we need
+    // LOWER(db_name) = substring of LOWER(external_name), not the other way round).
+    const externalNameLower = data.name.toLowerCase();
+    const candidates = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM exercises
+      WHERE is_active = true
+        AND deleted_at IS NULL
+        AND external_id IS NULL
+        AND LOWER(name) != ${externalNameLower}
+        AND ${externalNameLower} LIKE '%' || LOWER(name) || '%'
+      LIMIT 1
+    `;
+    if (candidates.length > 0) {
+      byName = await prisma.exercise.findFirst({ where: { id: candidates[0].id } });
+    }
+  }
 
   if (byName) {
     // If it's already claimed by a different external source, leave it alone

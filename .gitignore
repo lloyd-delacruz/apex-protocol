@@ -1,5 +1,23 @@
+# Next.js
+.next/
+out/
+
+# Cache
 node_modules/
+.cache/
 dist/
-build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env
 .env
-.DS_Store
+.env.local
+
+# TypeScript
+*.tsbuildinfo
+
+# AI Settings
+.claude/

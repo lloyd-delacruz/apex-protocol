@@ -183,4 +183,43 @@ router.post('/exercises/reclassify', async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+// ─── PATCH /api/admin/exercises/:id ───────────────────────────────────────────
+
+/**
+ * Manually set the mediaUrl (gifUrl) for a single exercise.
+ * Useful for backfilling seeded exercises whose names don't match ExerciseDB.
+ *
+ * Body: { mediaUrl: string | null }
+ */
+router.patch('/exercises/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const body = req.body ?? {};
+
+    if (!('mediaUrl' in body)) {
+      res.status(400).json({ success: false, data: null, error: 'mediaUrl is required in request body' });
+      return;
+    }
+
+    const mediaUrl = body.mediaUrl === null || body.mediaUrl === '' ? null : String(body.mediaUrl);
+
+    const exercise = await prisma.exercise.findFirst({ where: { id } });
+    if (!exercise) {
+      res.status(404).json({ success: false, data: null, error: 'Exercise not found' });
+      return;
+    }
+
+    const updated = await prisma.exercise.update({
+      where: { id },
+      data: { mediaUrl },
+    });
+
+    res.json({ success: true, data: { id: updated.id, name: updated.name, mediaUrl: updated.mediaUrl }, error: null });
+  } catch (err: unknown) {
+    const e = err as Error & { statusCode?: number };
+    console.error('[Admin] Exercise mediaUrl update failed:', e.message);
+    res.status(e.statusCode ?? 500).json({ success: false, data: null, error: 'Update failed. Check server logs.' });
+  }
+});
+
 export default router;

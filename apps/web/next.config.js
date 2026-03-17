@@ -4,6 +4,22 @@ const nextConfig = {
   experimental: {
     typedRoutes: false,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'v2.exercisedb.io',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.exercisedb.io',
+      },
+      {
+        protocol: 'https',
+        hostname: 'exercisedb.p.rapidapi.com',
+      },
+    ],
+  },
   async rewrites() {
     return [
       {

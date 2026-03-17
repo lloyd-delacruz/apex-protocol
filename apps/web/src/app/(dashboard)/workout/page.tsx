@@ -32,6 +32,7 @@ interface WorkoutExercise {
   setCount: number;
   repMin: number;
   repMax: number;
+  mediaUrl?: string | null;
   // Enriched metadata
   equipment?: string | null;
   bodyPart?: string | null;
@@ -70,12 +71,51 @@ function parsePrescription(ep: ApiExercisePrescription): WorkoutExercise {
     setCount: 3,
     repMin: parts[0] ?? 8,
     repMax: parts[1] ?? parts[0] ?? 12,
+    mediaUrl: ep.exercise.mediaUrl,
     equipment: ep.exercise.equipment,
     bodyPart: ep.exercise.bodyPart,
     primaryMuscle: ep.exercise.primaryMuscle,
     movementPattern: ep.exercise.movementPattern,
     difficulty: ep.exercise.difficulty,
   };
+}
+
+// ── Exercise thumbnail ─────────────────────────────────────────────────────────
+const MUSCLE_GRADIENT: Record<string, string> = {
+  Quadriceps:   'from-blue-500/30 to-blue-700/30',
+  Hamstrings:   'from-purple-500/30 to-purple-700/30',
+  Chest:        'from-red-500/30 to-red-700/30',
+  Back:         'from-green-500/30 to-green-700/30',
+  Shoulders:    'from-yellow-500/30 to-yellow-700/30',
+  Biceps:       'from-cyan-500/30 to-cyan-700/30',
+  Triceps:      'from-orange-500/30 to-orange-700/30',
+  Core:         'from-teal-500/30 to-teal-700/30',
+  Glutes:       'from-pink-500/30 to-pink-700/30',
+};
+
+function ExerciseThumbnail({ mediaUrl, name, muscleGroup }: { mediaUrl?: string | null; name: string; muscleGroup?: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (mediaUrl && !failed) {
+    return (
+      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-surface-elevated">
+        <img
+          src={mediaUrl}
+          alt={name}
+          className="w-full h-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  const gradient = MUSCLE_GRADIENT[muscleGroup ?? ''] ?? 'from-accent/20 to-accent-secondary/20';
+  const initials = name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  return (
+    <div className={`w-14 h-14 rounded-xl flex-shrink-0 bg-gradient-to-br ${gradient} flex items-center justify-center border border-white/[0.06]`}>
+      <span className="text-sm font-bold text-text-muted">{initials}</span>
+    </div>
+  );
 }
 
 // ── SVG circle countdown ───────────────────────────────────────────────────────
@@ -152,6 +192,8 @@ export default function WorkoutPage() {
         setTodayWorkout(w);
         if (w?.workoutDay?.exercisePrescriptions) {
           const parsed = w.workoutDay.exercisePrescriptions.map(parsePrescription);
+          // DEBUG: log exercise mediaUrls to confirm data flow
+          console.log('[Workout] exercises mediaUrl check:', parsed.map((e) => ({ name: e.name, mediaUrl: e.mediaUrl })));
           setExercises(parsed);
 
           // Batch fetch suggested weights for exercises in today's workout
@@ -445,9 +487,11 @@ export default function WorkoutPage() {
               return (
                 <div key={ex.prescriptionId} className="flex items-center justify-between p-4 bg-background rounded-card border border-white/[0.04] transition-colors hover:bg-white/[0.02]">
                   <div className="flex items-center gap-4">
-                    <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center text-sm font-bold text-text-muted shadow-sm">
-                      {idx + 1}
-                    </span>
+                    <ExerciseThumbnail
+                      mediaUrl={ex.mediaUrl}
+                      name={ex.name}
+                      muscleGroup={ex.primaryMuscle ?? ex.muscleGroup}
+                    />
                     <div>
                       <p className="text-base font-bold text-text-primary tracking-tight">{ex.name}</p>
                       <p className="text-sm font-medium text-text-muted mt-0.5">
