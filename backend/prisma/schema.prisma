@@ -32,6 +32,9 @@ model User {
   passwordHash String    @map("password_hash")
   firstName    String?   @map("first_name") @db.VarChar(100)
   lastName     String?   @map("last_name") @db.VarChar(100)
+  gender       String?   @db.VarChar(20)
+  dateOfBirth  DateTime? @map("date_of_birth") @db.Date
+  height       Decimal?  @db.Decimal(5, 2) // in cm
   isActive     Boolean   @default(true) @map("is_active")
   deletedAt    DateTime? @map("deleted_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -44,6 +47,9 @@ model User {
   userProgramAssignments UserProgramAssignment[]
   createdPrograms        Program[]               @relation("CreatedPrograms")
   exerciseWeights        UserExerciseWeight[]
+  workoutSessions        WorkoutSession[]
+  exercisePreferences    ExercisePreference[]
+  weeklyProgress         WeeklyProgress[]
 
   @@index([roleId])
   @@map("users")
@@ -149,6 +155,7 @@ model WorkoutDay {
   programWeek           ProgramWeek            @relation(fields: [programWeekId], references: [id], onDelete: Cascade)
   exercisePrescriptions ExercisePrescription[]
   trainingLogs          TrainingLog[]
+  workoutSessions       WorkoutSession[]
 
   @@index([programWeekId])
   @@index([sortOrder])
@@ -192,6 +199,8 @@ model Exercise {
   substitutionsAsSubstitute ExerciseSubstitution[] @relation("SubstituteExercise")
   trainingLogs              TrainingLog[]
   userExerciseWeights       UserExerciseWeight[]
+  sessionExercises          WorkoutSessionExercise[]
+  preferences               ExercisePreference[]
 
   @@unique([externalId, externalSource]) // Prevents duplicate imports; NULL values are distinct in PostgreSQL so existing rows are unaffected
   @@index([movementPattern])
@@ -356,4 +365,115 @@ model UserExerciseWeight {
   @@unique([userId, exerciseId])
   @@index([userId])
   @@map("user_exercise_weights")
+}
+
+// ─── Workout Sessions ─────────────────────────────────────────────────────────
+
+model WorkoutSession {
+  id                   String    @id @default(uuid())
+  userId               String    @map("user_id")
+  workoutDayId         String?   @map("workout_day_id")
+  startedAt            DateTime  @default(now()) @map("started_at")
+  finishedAt           DateTime? @map("finished_at")
+  durationSec          Int?      @map("duration_sec")
+  status               String    @default("in_progress") @db.VarChar(20) // in_progress, completed, abandoned
+  totalVolume          Decimal?  @db.Decimal(12, 2) @map("total_volume")
+  estimatedCalories    Int?      @map("estimated_calories")
+  completedExerciseCount Int     @default(0) @map("completed_exercise_count")
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDay WorkoutDay? @relation(fields: [workoutDayId], references: [id])
+  exercises  WorkoutSessionExercise[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("workout_sessions")
+}
+
+// ─── Workout Session Exercises ────────────────────────────────────────────────
+
+model WorkoutSessionExercise {
+  id                   String   @id @default(uuid())
+  sessionId            String   @map("session_id")
+  exerciseId           String   @map("exercise_id")
+  workoutExerciseId    String?  @map("workout_exercise_id") // Reference to original template if applicable
+  orderIndex           Int      @map("order_index")
+  wasReplaced          Boolean  @default(false) @map("was_replaced")
+  replacementReason    String?  @map("replacement_reason")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise       @relation(fields: [exerciseId], references: [id])
+  sets     LoggedSet[]
+
+  @@index([sessionId])
+  @@index([exerciseId])
+  @@map("workout_session_exercises")
+}
+
+// ─── Logged Sets ─────────────────────────────────────────────────────────────
+
+model LoggedSet {
+  id                    String   @id @default(uuid())
+  sessionExerciseId     String   @map("session_exercise_id")
+  setType               String   @default("working") @map("set_type") @db.VarChar(20) // warmup, working, dropset, failure
+  setOrder              Int      @map("set_order")
+  targetReps            Int?     @map("target_reps")
+  actualReps            Int?     @map("actual_reps")
+  targetWeight          Decimal? @map("target_weight") @db.Decimal(8, 2)
+  actualWeight          Decimal? @map("actual_weight") @db.Decimal(8, 2)
+  unit                  String   @default("kg") @db.VarChar(20)
+  rir                   Int?     @map("rir") // Reps in Reserve
+  rpe                   Decimal? @map("rpe") @db.Decimal(3, 1) // Rate of Perceived Exertion
+  completed             Boolean  @default(false)
+  completedAt           DateTime? @map("completed_at")
+  restAfterSec          Int?     @map("rest_after_sec")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  sessionExercise WorkoutSessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([sessionExerciseId])
+  @@map("logged_sets")
+}
+
+// ─── Exercise Preferences ────────────────────────────────────────────────────
+
+model ExercisePreference {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  exerciseId     String   @map("exercise_id")
+  preferenceType String   @map("preference_type") @db.VarChar(50) // more_often, less_often, exclude
+  source         String   @default("user_action") @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@unique([userId, exerciseId])
+  @@map("exercise_preferences")
+}
+
+// ─── Weekly Progress ──────────────────────────────────────────────────────────
+
+model WeeklyProgress {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  weekStartDate     DateTime @map("week_start_date") @db.Date
+  workoutsCompleted Int      @default(0) @map("workouts_completed")
+  weeklyGoal        Int      @default(3) @map("weekly_goal")
+  streakCount       Int      @default(0) @map("streak_count")
+  milestoneState    Json?    @map("milestone_state")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStartDate])
+  @@map("weekly_progress")
 }

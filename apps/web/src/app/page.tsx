@@ -16,7 +16,13 @@ export default function LandingPage() {
     e.preventDefault();
     // DEV BYPASS: skip auth, go straight to dashboard
     localStorage.setItem('apex_token', 'dev-bypass-token');
-    router.push('/dashboard');
+
+    const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
+    if (!onboardingComplete) {
+      router.push('/onboarding');
+    } else {
+      router.push('/dashboard');
+    }
   }
 
   return (

@@ -30,6 +30,8 @@ module.exports = {
       boxShadow: {
         'accent-sm': '0 0 12px rgba(0, 194, 255, 0.15)',
         'accent-md': '0 0 24px rgba(0, 194, 255, 0.2)',
+        'accent-elevated': '0 0 40px rgba(0, 194, 255, 0.25), 0 8px 32px rgba(0, 0, 0, 0.4)',
+        'accent': '0 0 20px rgba(0, 194, 255, 0.3)',
         'surface': '0 4px 24px rgba(0, 0, 0, 0.4)',
         'elevated': '0 8px 32px rgba(0, 0, 0, 0.6)',
       },
@@ -41,6 +43,7 @@ module.exports = {
         'pulse-accent': 'pulse-accent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-up': 'slide-up 0.3s ease-out',
+        'scale-in': 'scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       keyframes: {
         'pulse-accent': {
@@ -55,8 +58,12 @@ module.exports = {
           from: { transform: 'translateY(8px)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
         },
+        'scale-in': {
+          from: { transform: 'scale(0.85)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
       },
     },
   },
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 };

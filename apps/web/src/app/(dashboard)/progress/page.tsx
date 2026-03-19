@@ -1,337 +1,201 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Card from '@/components/ui/Card';
-import StatusBadge from '@/components/ui/StatusBadge';
+import React, { useState, useEffect } from 'react';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
-import api, { ApiAnalyticsDashboard } from '@/lib/api';
-import { TrainingStatus } from '@apex/shared';
+  Activity,
+  Trophy,
+  ArrowUpRight,
+} from 'lucide-react';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import api, { ApiAnalyticsDashboard, ApiTrainingLog } from '@/lib/api';
+import StreakProgressCard from '@/components/dashboard/StreakProgressCard';
+import WeeklyProgressStats from '@/components/dashboard/WeeklyProgressStats';
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function computeDaysThisWeek(logs: ApiTrainingLog[]): boolean[] {
+  const today = new Date();
+  const dow = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((dow + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const days = Array(7).fill(false) as boolean[];
+  const seen = new Set<number>();
+  for (const log of logs) {
+    const d = new Date(log.sessionDate);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.round((d.getTime() - monday.getTime()) / 86400000);
+    if (diff >= 0 && diff < 7 && !seen.has(diff)) {
+      seen.add(diff);
+      days[diff] = true;
+    }
+  }
+  return days;
 }
-
-function formatWeek(week: string): string {
-  // "2026-W10" → "W10"
-  return week.split('-')[1] ?? week;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  ACHIEVED: '#10B981',
-  PROGRESS: '#00C2FF',
-  FAILED: '#EF4444',
-};
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-surface-elevated border border-white/[0.08] rounded-card px-3 py-2 text-sm">
-      <p className="text-text-muted text-xs mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color }} className="font-semibold">
-          {p.value}{p.name === 'volume' ? ' vol' : 'kg'}
-        </p>
-      ))}
-    </div>
-  );
-};
 
 export default function ProgressPage() {
   const [analytics, setAnalytics] = useState<ApiAnalyticsDashboard | null>(null);
+  const [daysThisWeek, setDaysThisWeek] = useState<boolean[]>(Array(7).fill(false));
+  const [totalSessions, setTotalSessions] = useState(0);
+  const [totalVolume, setTotalVolume] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   useEffect(() => {
-    api.analytics.dashboard()
-      .then((data) => {
-        setAnalytics(data);
-        if (data.strengthTrends?.length > 0) {
-          setSelectedExercise(data.strengthTrends[0].exercise);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.analytics.dashboard().catch(() => null),
+      api.trainingLog.history({ limit: 100 }).catch(() => null),
+    ]).then(([dash, logs]) => {
+      setAnalytics(dash);
+      if (logs?.logs) {
+        setDaysThisWeek(computeDaysThisWeek(logs.logs));
+        const uniqueDates = new Set(logs.logs.map((l: ApiTrainingLog) => l.sessionDate));
+        setTotalSessions(uniqueDates.size);
+      }
+      if (dash?.weeklyVolume?.length) {
+        const total = dash.weeklyVolume.reduce((sum: number, w: { volume: number }) => sum + w.volume, 0);
+        setTotalVolume(total);
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-text-muted text-sm">Loading analytics...</div>
-      </div>
-    );
-  }
+  const streakDays = analytics?.adherence?.streak ?? 0;
+  const latestVolume = analytics?.weeklyVolume?.at(-1)?.volume ?? 0;
+  const prevVolume = analytics?.weeklyVolume?.at(-2)?.volume ?? 0;
+  const volumeChangePct = prevVolume > 0 ? Math.round(((latestVolume - prevVolume) / prevVolume) * 100) : 0;
+  const setsCompleted = analytics?.statusBreakdown?.total ?? 0;
+  const sessionsLast4Weeks = analytics?.adherence?.sessionsLast4Weeks ?? 0;
 
   const strengthTrends = analytics?.strengthTrends ?? [];
-  const weeklyVolume = analytics?.weeklyVolume ?? [];
-  const statusBreakdown = analytics?.statusBreakdown;
-  const adherence = analytics?.adherence;
+  const personalBests = strengthTrends.slice(0, 4).map((t) => {
+    const lastPoint = t.dataPoints.at(-1);
+    return {
+      exercise: t.exercise,
+      stats: `${t.currentWeight}kg × ${lastPoint?.totalReps ?? '—'}`,
+      date: lastPoint?.date
+        ? new Date(lastPoint.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : '—',
+    };
+  });
 
-  const selectedTrend = strengthTrends.find((t) => t.exercise === selectedExercise);
-  const chartData = (selectedTrend?.dataPoints ?? []).map((dp) => ({
-    date: formatDate(dp.date),
-    weight: dp.weight,
-  }));
-
-  const currentWeight = selectedTrend?.currentWeight ?? 0;
-  const weightChangePct = selectedTrend?.weightChangePct ?? 0;
-  const weightChange = chartData.length >= 2
-    ? chartData[chartData.length - 1].weight - chartData[0].weight
-    : 0;
-
-  const pieData = statusBreakdown && statusBreakdown.total > 0
-    ? [
-        { name: 'Achieved', value: Math.round((statusBreakdown.achieved / statusBreakdown.total) * 100), color: '#10B981' },
-        { name: 'Progress', value: Math.round((statusBreakdown.progress / statusBreakdown.total) * 100), color: '#00C2FF' },
-        { name: 'Failed', value: Math.round((statusBreakdown.failed / statusBreakdown.total) * 100), color: '#EF4444' },
-      ]
-    : [];
-
-  const volumeChartData = weeklyVolume.map((w) => ({
-    week: formatWeek(w.week),
-    volume: Math.round(w.volume),
-  }));
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="w-10 h-10 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
+      <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Calculating Gains...</span>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Overview stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <p className="label">Sessions (4wk)</p>
-          <p className="font-heading text-3xl font-bold text-text-primary mt-2">
-            {adherence?.sessionsLast4Weeks ?? 0}
-          </p>
-          <p className="text-xs text-text-muted mt-1">last 4 weeks</p>
-        </Card>
-        <Card className="p-4">
-          <p className="label">Adherence Rate</p>
-          <p className="font-heading text-3xl font-bold text-accent mt-2">
-            {adherence ? `${Math.round(adherence.adherenceRate)}%` : '—'}
-          </p>
-          <p className="text-xs text-text-muted mt-1">of expected sessions</p>
-        </Card>
-        <Card className="p-4">
-          <p className="label">Achieved Rate</p>
-          <p className="font-heading text-3xl font-bold text-success mt-2">
-            {statusBreakdown && statusBreakdown.total > 0
-              ? `${Math.round((statusBreakdown.achieved / statusBreakdown.total) * 100)}%`
-              : '—'}
-          </p>
-          <p className="text-xs text-text-muted mt-1">of all sets</p>
-        </Card>
-        <Card className="p-4">
-          <p className="label">Training Streak</p>
-          <p className="font-heading text-3xl font-bold text-accent-secondary mt-2">
-            {adherence?.streak ?? 0}
-          </p>
-          <p className="text-xs text-text-muted mt-1">days</p>
-        </Card>
+    <div className="max-w-5xl mx-auto space-y-10 pb-20">
+      {/* Header */}
+      <div>
+        <h1 className="text-4xl font-black text-text-primary uppercase italic tracking-tighter leading-none mb-2">
+           Protocol <span className="text-accent underline decoration-white/10 underline-offset-8">Analytics</span>
+        </h1>
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] ml-1">Archive of your physical evolution</p>
       </div>
 
-      {/* Main charts row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Weight progression chart */}
-        <Card elevated className="xl:col-span-2 p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h3 className="section-title">Weight Progression</h3>
-              <p className="text-text-muted text-xs mt-0.5">Working weight over time</p>
-            </div>
-            {strengthTrends.length > 0 && (
-              <div className="flex flex-wrap gap-1 max-w-xs justify-end">
-                {strengthTrends.map((t) => (
-                  <button
-                    key={t.exercise}
-                    onClick={() => setSelectedExercise(t.exercise)}
-                    className={`px-3 py-1 rounded-[6px] text-xs font-medium transition-transform duration-150 ${
-                      selectedExercise === t.exercise
-                        ? 'bg-accent/10 text-accent border border-accent/20'
-                        : 'text-text-muted hover:text-text-primary border border-transparent'
-                    }`}
-                  >
-                    {t.exercise.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      {/* Hero Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         <div className="lg:col-span-2">
+            <StreakProgressCard
+              currentStreak={streakDays}
+              bestStreak={streakDays}
+              daysThisWeek={daysThisWeek}
+              weeklyGoal={4}
+            />
+         </div>
+         <Card className="p-8 bg-surface border border-white/[0.08] rounded-[40px] flex flex-col justify-between group overflow-hidden relative">
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-accent/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
 
-          {chartData.length > 0 ? (
-            <>
-              <div className="flex gap-6 mb-4">
-                <div>
-                  <p className="label">Current</p>
-                  <p className="text-lg font-bold text-text-primary">{currentWeight}kg</p>
-                </div>
-                <div>
-                  <p className="label">Change</p>
-                  <p className={`text-lg font-bold ${weightChange >= 0 ? 'text-success' : 'text-danger'}`}>
-                    {weightChange >= 0 ? '+' : ''}{weightChange.toFixed(1)}kg
-                  </p>
-                </div>
-                <div>
-                  <p className="label">% Change</p>
-                  <p className={`text-lg font-bold ${weightChangePct >= 0 ? 'text-success' : 'text-danger'}`}>
-                    {weightChangePct >= 0 ? '+' : ''}{weightChangePct.toFixed(1)}%
-                  </p>
-                </div>
-              </div>
-
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="date" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="weight"
-                    stroke="#00C2FF"
-                    strokeWidth={2.5}
-                    dot={{ fill: '#00C2FF', strokeWidth: 0, r: 4 }}
-                    activeDot={{ r: 6, fill: '#00C2FF', stroke: '#0A0A0F', strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-48 text-text-muted text-sm">
-              No training data yet. Complete some workouts to see progression.
-            </div>
-          )}
-        </Card>
-
-        {/* Status breakdown */}
-        <Card className="p-5">
-          <h3 className="section-title mb-1">Set Status Breakdown</h3>
-          <p className="text-text-muted text-xs mb-4">All logged sets</p>
-
-          {pieData.length > 0 ? (
-            <>
-              <div className="flex justify-center">
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={index} fill={entry.color} stroke="transparent" />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => [`${value}%`, '']}
-                      contentStyle={{
-                        background: '#1A1A26',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '8px',
-                        color: '#F0F0F5',
-                        fontSize: '12px',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2 mt-2">
-                {pieData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                      <span className="text-sm text-text-muted">{item.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-text-primary">{item.value}%</span>
+            <div className="relative z-10">
+               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Total Achievement</p>
+               <div className="space-y-6">
+                  <div>
+                     <span className="text-4xl font-black text-text-primary italic tabular-nums">{totalSessions}</span>
+                     <span className="text-xs font-bold text-text-muted uppercase tracking-widest ml-2">Sessions</span>
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-48 text-text-muted text-sm text-center">
-              Log workouts to see your status breakdown
+                  <div>
+                     <span className="text-4xl font-black text-accent italic tabular-nums">
+                       {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}K` : totalVolume}
+                     </span>
+                     <span className="text-xs font-bold text-text-muted uppercase tracking-widest ml-2">KG Lifted</span>
+                  </div>
+               </div>
             </div>
-          )}
-        </Card>
+
+            <Button variant="ghost" className="mt-8 h-12 rounded-2xl font-black uppercase tracking-widest text-[10px] border-white/[0.06] hover:bg-white/[0.04]">
+               Download Report <ArrowUpRight size={14} className="ml-2" />
+            </Button>
+         </Card>
       </div>
 
-      {/* Volume chart */}
-      <Card elevated className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="section-title">Weekly Training Volume</h3>
-            <p className="text-text-muted text-xs mt-0.5">Weight × reps per week</p>
-          </div>
-          {volumeChartData.length > 0 && (
-            <div className="text-right">
-              <p className="text-xs text-text-muted">Latest week</p>
-              <p className="text-lg font-bold text-accent">
-                {volumeChartData[volumeChartData.length - 1]?.volume?.toLocaleString()}
-              </p>
+      {/* Detailed Stats */}
+      <div className="space-y-6">
+         <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em]">Biometric Trends</h3>
+            <div className="flex gap-2">
+               <button className="px-3 py-1.5 rounded-xl bg-surface-elevated border border-accent/40 text-accent text-[10px] font-black uppercase tracking-widest">Volume</button>
+               <button className="px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-text-muted text-[10px] font-black uppercase tracking-widest">Intensity</button>
             </div>
-          )}
-        </div>
+         </div>
+         <WeeklyProgressStats
+           totalVolume={latestVolume}
+           sessions={sessionsLast4Weeks}
+           setsCompleted={setsCompleted}
+           volumeChangePct={volumeChangePct}
+         />
+      </div>
 
-        {volumeChartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={volumeChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="week" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="volume" fill="#00C2FF" radius={[4, 4, 0, 0]} fillOpacity={0.8} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-48 text-text-muted text-sm">
-            No volume data yet
-          </div>
-        )}
-      </Card>
+      {/* Muscle Distribution & Personal Bests */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+         <Card className="p-8 bg-surface border border-white/[0.08] rounded-[40px]">
+            <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+               <Activity size={16} className="text-accent" /> Muscle Activation
+            </h3>
+            <div className="space-y-5">
+               {[
+                  { muscle: 'Chest', pct: 85, color: 'bg-accent' },
+                  { muscle: 'Back', pct: 72, color: 'bg-accent' },
+                  { muscle: 'Legs', pct: 64, color: 'bg-accent-secondary' },
+                  { muscle: 'Shoulders', pct: 45, color: 'bg-white/20' },
+                  { muscle: 'Arms', pct: 30, color: 'bg-white/10' },
+               ].map((m) => (
+                  <div key={m.muscle} className="space-y-2">
+                     <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">{m.muscle}</span>
+                        <span className="text-[10px] font-black text-text-muted italic">{m.pct}%</span>
+                     </div>
+                     <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className={`h-full ${m.color} rounded-full transition-opacity duration-1000`} style={{ width: `${m.pct}%` }} />
+                     </div>
+                  </div>
+               ))}
+            </div>
+         </Card>
 
-      {/* Top progressing exercises */}
-      {strengthTrends.length > 0 && (
-        <Card className="p-5">
-          <h3 className="section-title mb-4">Strength Trends</h3>
-          <div className="space-y-3">
-            {strengthTrends.map((trend, idx) => {
-              const status: TrainingStatus = trend.weightChangePct >= 5 ? 'ACHIEVED' : trend.weightChangePct >= 0 ? 'PROGRESS' : 'FAILED';
-              return (
-                <div key={trend.exercise} className="flex items-center gap-4 p-3 rounded-card bg-background border border-white/[0.04]">
-                  <span className="w-7 h-7 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-text-muted flex-shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-text-primary">{trend.exercise}</p>
+         <Card className="p-8 bg-surface border border-white/[0.08] rounded-[40px]">
+            <div className="flex items-center justify-between mb-6">
+               <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Trophy size={16} className="text-yellow-500" /> Personal Hall
+               </h3>
+               <button className="text-[10px] font-black text-accent uppercase tracking-widest hover:underline">View All</button>
+            </div>
+            <div className="space-y-4">
+               {personalBests.length > 0 ? personalBests.map((pb, i) => (
+                  <div key={i} className="p-4 bg-white/[0.02] border border-white/[0.04] rounded-2xl flex items-center justify-between group hover:border-accent/40 transition-colors cursor-pointer">
+                     <div>
+                        <p className="text-xs font-black text-text-primary uppercase tracking-tight mb-1 group-hover:text-accent transition-colors">{pb.exercise}</p>
+                        <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{pb.date}</p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-sm font-black text-text-primary tabular-nums italic">{pb.stats}</p>
+                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-text-primary">{trend.currentWeight}kg</p>
-                    <p className={`text-xs ${trend.weightChangePct >= 0 ? 'text-success' : 'text-danger'}`}>
-                      {trend.weightChangePct >= 0 ? '+' : ''}{trend.weightChangePct.toFixed(1)}%
-                    </p>
-                  </div>
-                  <StatusBadge status={status} />
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+               )) : (
+                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-center py-8">No Records Yet</p>
+               )}
+            </div>
+         </Card>
+      </div>
     </div>
   );
 }

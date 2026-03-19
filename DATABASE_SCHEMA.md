@@ -1,644 +1,462 @@
-## Overview
+# Apex Protocol: Database Schema Documentation
 
-This document defines the database design for **Apex Protocol**, a performance training platform for tracking:
+This document defines the database design for **Apex Protocol**, a high-performance training platform tracking workout programs, live sessions, granular set performance, and user progression.
 
-- workout programs
-- exercise prescriptions
-- training logs
-- progression logic
-- body metrics
-- authentication and users
-
-The database is designed for:
-
-- PostgreSQL
-- normalized structure
-- scalability
-- maintainability
-- future SaaS expansion
+## Domains
+1. [Identity & Authentication](#1-identity--authentication)
+2. [Profiles & Onboarding](#2-profiles--onboarding)
+3. [Equipment & Environment](#3-equipment--environment)
+4. [Program Templates](#4-program-templates)
+5. [Exercise Library](#5-exercise-library)
+6. [Workout Execution (Runtime)](#6-workout-execution-runtime)
+7. [Progress & Analytics](#7-progress--analytics)
+8. [Architecture & Logic Notes](#architecture--logic-notes)
 
 ---
 
-## Design Principles
+## 1. Identity & Authentication
 
-The schema is built with these principles:
-
-1. **Separation of concerns**  
-   Program templates are separate from user training logs.
-
-2. **Normalized data model**  
-   Exercises, programs, workout days, and logs are stored in separate but related tables.
-
-3. **Auditability**  
-   Core tables include timestamps for traceability.
-
-4. **Extensibility**  
-   The structure supports future features such as:
-   - coach accounts
-   - shared templates
-   - exercise substitutions
-   - notifications
-   - analytics
-   - mobile sync
-
----
-
-## High-Level Entity Relationships
-
-```text
-users
-  ├── roles
-  ├── refresh_tokens
-  ├── body_metrics
-  ├── training_logs
-  └── user_program_assignments
-
-programs
-  ├── program_months
-  │    ├── program_weeks
-  │    │    ├── workout_days
-  │    │    │    └── exercise_prescriptions
-  │    │    │          └── exercises
-  │    └── ...
-  └── ...
-
-exercises
-  └── exercise_substitutions
-Core Tables
-1. roles
-
+### 1.1 roles
 Stores system roles for access control.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique role identifier
-name	VARCHAR(50)	UNIQUE, NOT NULL	Role name (admin, user, coach)
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-2. users
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique role identifier |
+| name | VARCHAR(50) | UNIQUE, NOT NULL | Role name (admin, user, coach) |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Stores user accounts.
+### 1.2 users
+Core user accounts.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique user identifier
-role_id	UUID	FK → roles.id, NOT NULL	User role
-email	VARCHAR(255)	UNIQUE, NOT NULL	User email
-password_hash	TEXT	NOT NULL	Hashed password
-first_name	VARCHAR(100)	NULL	First name
-last_name	VARCHAR(100)	NULL	Last name
-is_active	BOOLEAN	DEFAULT true	Active status
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique user identifier |
+| role_id | UUID | FK → roles.id | User role |
+| email | VARCHAR(255) | UNIQUE, NOT NULL | User email |
+| password_hash | TEXT | NOT NULL | Hashed password |
+| first_name | VARCHAR(100) | NULL | First name |
+| last_name | VARCHAR(100) | NULL | Last name |
+| is_active | BOOLEAN | DEFAULT true | Active status |
+| deleted_at | TIMESTAMP | NULL | Soft-delete timestamp |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Indexes
+### 1.3 refresh_tokens
+Auth session refresh tokens.
 
-unique index on email
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique token identifier |
+| user_id | UUID | FK → users.id | Token owner |
+| token_hash | TEXT | NOT NULL | Hashed refresh token |
+| expires_at | TIMESTAMP | NOT NULL | Expiration |
+| revoked_at | TIMESTAMP | NULL | Revocation time |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
 
-index on role_id
+---
 
-3. refresh_tokens
+## 2. Profiles & Onboarding
 
-Stores refresh tokens for auth sessions.
+### 2.1 user_profiles
+Stable user profile and health data.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique token identifier
-user_id	UUID	FK → users.id, NOT NULL	Token owner
-token_hash	TEXT	NOT NULL	Hashed refresh token
-expires_at	TIMESTAMP	NOT NULL	Expiration
-revoked_at	TIMESTAMP	NULL	Revocation time
-created_at	TIMESTAMP	NOT NULL	Created timestamp
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| user_id | UUID | FK → users.id, UNIQUE | Profile owner |
+| gender | VARCHAR(50) | NULL | Training profile field |
+| date_of_birth| DATE | NULL | DOB |
+| height_value | NUMERIC(6,2) | NULL | Height |
+| height_unit | VARCHAR(10) | DEFAULT cm | Unit |
+| weight_value | NUMERIC(6,2) | NULL | Current weight |
+| weight_unit | VARCHAR(10) | DEFAULT kg | Unit |
+| preferred_weight_unit | VARCHAR(10) | DEFAULT lb | Default workout unit |
+| apple_health_connected | BOOLEAN | DEFAULT false | Health connection state |
+| last_health_sync_at | TIMESTAMP | NULL | Last sync |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Indexes
+### 2.2 onboarding_profiles
+Onboarding responses used for program generation.
 
-index on user_id
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record |
+| user_id | UUID | FK → users.id, NULL | Nullable until signup |
+| goal | VARCHAR(50) | NULL | strength, muscle, fatigue_mgmt, etc. |
+| consistency | VARCHAR(50) | NULL | Training consistency level |
+| experience | VARCHAR(50) | NULL | Training experience |
+| environment | VARCHAR(50) | NULL | gym, home, etc. |
+| workouts_per_week | INTEGER | NULL | Preferred frequency |
+| specific_days | JSONB | NULL | Array of selected days |
+| body_stats_snapshot | JSONB | NULL | weight/BF at onboarding |
+| notification_opt_in | BOOLEAN | DEFAULT false | Preview opt-in |
+| notification_time | TIME | NULL | Preferred reminder time |
+| completed_at | TIMESTAMP | NULL | Completion date |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-index on expires_at
+### 2.3 notification_preferences
+User notification settings.
 
-4. programs
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record |
+| user_id | UUID | FK → users.id, UNIQUE | Owner |
+| workout_preview_enabled | BOOLEAN | DEFAULT false | Preview/reminder toggle |
+| workout_preview_time | TIME | NULL | Preferred reminder time |
+| push_enabled | BOOLEAN | DEFAULT false | General push flag |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Stores reusable training programs.
+---
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique program identifier
-name	VARCHAR(255)	NOT NULL	Program name
-slug	VARCHAR(255)	UNIQUE, NOT NULL	URL-friendly unique identifier
-description	TEXT	NULL	Program description
-total_weeks	INTEGER	NOT NULL	Total number of weeks
-is_active	BOOLEAN	DEFAULT true	Program availability
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-5. program_months
+## 3. Equipment & Environment
 
-Stores month blocks within a program.
+### 3.1 equipment_profiles
+Equipment presets or user-specific gym setups.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique month identifier
-program_id	UUID	FK → programs.id, NOT NULL	Parent program
-month_number	INTEGER	NOT NULL	Month sequence (1, 2, 3)
-name	VARCHAR(255)	NOT NULL	Month label
-description	TEXT	NULL	Month description
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| user_id | UUID | FK → users.id, NULL | Owner if user-specific |
+| onboarding_profile_id | UUID | FK → onboarding_profiles.id, NULL | Source onboarding |
+| name | VARCHAR(255) | NOT NULL | Profile name (Commercial Gym, Home, etc.) |
+| environment_type | VARCHAR(50) | NULL | Category |
+| is_default | BOOLEAN | DEFAULT false | Default flag |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Unique Constraint
+### 3.2 equipment_profile_items
+Individual pieces of equipment in a profile.
 
-(program_id, month_number)
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique item record |
+| equipment_profile_id | UUID | FK → equipment_profiles.id | Parent profile |
+| equipment_code | VARCHAR(100) | NOT NULL | Canonical code (e.g. barbell) |
+| label | VARCHAR(255) | NOT NULL | Display name |
+| metadata | JSONB | NULL | Optional range info |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
 
-6. program_weeks
+---
 
-Stores weeks within a program month.
+## 4. Program Templates
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique week identifier
-program_month_id	UUID	FK → program_months.id, NOT NULL	Parent month
-week_number	INTEGER	NOT NULL	Week sequence inside month
-absolute_week_number	INTEGER	NOT NULL	Overall week number in the full program
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
+### 4.1 programs
+Reusable training programs.
 
-Unique Constraints
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| name | VARCHAR(255) | NOT NULL | Program name |
+| slug | VARCHAR(255) | UNIQUE, NOT NULL | URL-friendly ID |
+| goal | VARCHAR(50) | NULL | Target goal (strength, hypertrophy) |
+| difficulty | VARCHAR(50) | NULL | Beginner, Intermediate, Advanced |
+| split_type | VARCHAR(100) | NULL | PPL, Full Body, Upper/Lower |
+| total_weeks | INTEGER | NOT NULL | Duration |
+| is_system_generated | BOOLEAN | DEFAULT false | Generated by AI/onboarding |
+| is_active | BOOLEAN | DEFAULT true | Availability |
+| deleted_at | TIMESTAMP | NULL | Soft-delete timestamp |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-(program_month_id, week_number)
+### 4.2 program_months
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique month identifier |
+| program_id | UUID | FK → programs.id | Parent program |
+| month_number | INTEGER | NOT NULL | Sequence (1, 2, 3) |
+| name | VARCHAR(255) | NOT NULL | Label |
 
-(program_month_id, absolute_week_number) can be omitted if absolute week is globally unique per program flow
+### 4.3 program_weeks
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique week identifier |
+| program_month_id | UUID | FK → program_months.id | Parent month |
+| week_number | INTEGER | NOT NULL | Week in month |
+| absolute_week_number | INTEGER | NOT NULL | Absolute week in program |
 
-7. workout_days
+### 4.4 workout_days
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique day identifier |
+| program_week_id | UUID | FK → program_weeks.id | Parent week |
+| name | VARCHAR(255) | NULL | User-facing workout name |
+| day_code | VARCHAR(20) | NOT NULL | Mon, Tue, etc. |
+| phase | VARCHAR(50) | NOT NULL | Strength, Hypertrophy, etc. |
+| workout_type | VARCHAR(100) | NOT NULL | Upper, Lower, etc. |
+| estimated_duration_min| INTEGER | NULL | Planned session duration |
+| sort_order | INTEGER | NOT NULL | Position in week |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Stores workout day templates within a week.
+### 4.5 exercise_prescriptions
+Prescribed exercises for a workout day template.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique workout day identifier
-program_week_id	UUID	FK → program_weeks.id, NOT NULL	Parent week
-day_code	VARCHAR(20)	NOT NULL	Day label (Mon, Tue, etc.)
-phase	VARCHAR(50)	NOT NULL	Strength, Hypertrophy, Cardio, Rest
-workout_type	VARCHAR(100)	NOT NULL	Upper Strength, Lower Hypertrophy, etc.
-sort_order	INTEGER	NOT NULL	Day order inside week
-notes	TEXT	NULL	Optional notes
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record |
+| workout_day_id | UUID | FK → workout_days.id | Parent day |
+| exercise_id | UUID | FK → exercises.id | Selected exercise |
+| target_set_count | INTEGER | NULL | Working sets |
+| warmup_set_count | INTEGER | DEFAULT 0 | Warm-up sets |
+| target_rep_range | VARCHAR(50) | NULL | e.g. 8-12 |
+| target_weight | NUMERIC(8,2) | NULL | Suggested starting weight |
+| weight_unit | VARCHAR(20) | DEFAULT lb | lb or kg |
+| rest_seconds | INTEGER | NULL | Suggested rest |
+| is_focus_exercise | BOOLEAN | DEFAULT false | Primary movement flag |
+| sort_order | INTEGER | NOT NULL | Order in workout |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Indexes
+---
 
-index on program_week_id
+## 5. Exercise Library
 
-index on sort_order
+### 5.1 exercises
+The core exercise catalog.
 
-8. exercises
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| name | VARCHAR(255) | UNIQUE, NOT NULL | Exercise name |
+| slug | VARCHAR(255) | UNIQUE, NULL | URL-friendly identifier |
+| muscle_group | VARCHAR(100) | NULL | Primary muscle group |
+| muscle_groups | JSONB | NULL | Array of target muscle groups |
+| body_part | VARCHAR(100) | NULL | Upper Body, Lower Body, etc. |
+| exercise_type | VARCHAR(100) | NULL | compound, isolation, cardio, mobility |
+| movement_pattern | VARCHAR(100) | NULL | squat, hinge, push, etc. |
+| instructions | TEXT | NULL | Step-by-step notes |
+| media_url | TEXT | NULL | Image/GIF URL |
+| thumbnail_url | TEXT | NULL | Small preview image |
+| is_compound | BOOLEAN | DEFAULT false | Multi-joint flag |
+| is_weighted | BOOLEAN | DEFAULT false | Weighted exercise flag |
+| is_bodyweight | BOOLEAN | DEFAULT false | Bodyweight flag |
+| is_cardio | BOOLEAN | DEFAULT false | Cardio flag |
+| is_mobility | BOOLEAN | DEFAULT false | Mobility flag |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
 
-Stores the exercise library — both hand-authored exercises and exercises imported from ExerciseDB via RapidAPI.
+### 5.2 exercise_media
+Normalized table for additional exercise assets.
 
-### Legacy Fields (backward compatibility)
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique media record |
+| exercise_id | UUID | FK → exercises.id | Parent exercise |
+| media_type | VARCHAR(50) | NOT NULL | image, gif, video |
+| url | TEXT | NOT NULL | Media URL |
+| sort_order | INTEGER | DEFAULT 0 | Display order |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique exercise identifier
-name	VARCHAR(255)	UNIQUE, NOT NULL	Exercise name
-category	VARCHAR(100)	NULL	Legacy: compound, isolation, cardio
-muscle_group	VARCHAR(100)	NULL	Legacy: main target muscle
-equipment	VARCHAR(100)	NULL	barbell, dumbbell, cable, machine, kettlebell, band, bodyweight, cardio_machine, mixed, none
-is_active	BOOLEAN	DEFAULT true	Active flag
-deleted_at	TIMESTAMP	NULL	Soft-delete timestamp
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-
-### Enriched Taxonomy Fields
-
-These fields are populated automatically by the classification pipeline during import.
-
-Column	Type	Constraints	Description
-body_part	VARCHAR(100)	NULL	Upper Body, Lower Body, Core, Full Body, Cardio, Mobility
-primary_muscle	VARCHAR(100)	NULL	Primary target muscle (title case), e.g. Quadriceps
-secondary_muscles	JSONB	NULL	Array of secondary muscle strings
-movement_pattern	VARCHAR(100)	NULL	See Movement Pattern Values below
-exercise_type	VARCHAR(100)	NULL	compound, isolation, cardio, core, mobility, plyometric, rehab
-goal_tags	JSONB	NULL	Array of goal strings — strength, hypertrophy, fat_loss, endurance, athletic_performance, general_fitness, mobility_recovery
-difficulty	VARCHAR(50)	NULL	beginner, intermediate, advanced
-is_compound	BOOLEAN	NULL	True for multi-joint movements
-is_unilateral	BOOLEAN	NULL	True for single-limb movements
-
-### Media and Content Fields
-
-Column	Type	Constraints	Description
-media_url	TEXT	NULL	GIF or image URL from ExerciseDB
-video_url	TEXT	NULL	Optional video URL
-instructions	TEXT	NULL	Numbered step-by-step instructions (stored as plain text)
-
-### External Source Fields (deduplication)
-
-Column	Type	Constraints	Description
-external_id	VARCHAR(255)	NULL	ID from the external data source (e.g. ExerciseDB exercise ID)
-external_source	VARCHAR(100)	NULL	Source name, e.g. "exercisedb"
-last_synced_at	TIMESTAMP	NULL	Last time this record was refreshed from the external source
-
-Unique Constraint
-
-(external_id, external_source) — prevents duplicate imports from the same source
-
-### Indexes
-
-index on movement_pattern
-index on exercise_type
-index on difficulty
-index on external_source
-index on is_active
-index on (external_id, external_source) — unique
-
-### Movement Pattern Values
-
-| Value | Description |
-|-------|-------------|
-| `squat` | Knee-dominant lower body (squats, leg press, hack squat) |
-| `hinge` | Hip-dominant lower body (deadlift, RDL, hip thrust, leg curl) |
-| `lunge_single_leg` | Unilateral lower body (lunge, split squat, step-up) |
-| `horizontal_push` | Pressing movements parallel to torso (bench press, push-up, dip, chest fly) |
-| `vertical_push` | Pressing movements perpendicular to torso (OHP, lateral raise, shrug) |
-| `horizontal_pull` | Pulling movements parallel to torso (row, face pull, bicep curl) |
-| `vertical_pull` | Pulling movements perpendicular to torso (pull-up, lat pulldown) |
-| `rotation` | Rotational core movements (Russian twist, wood chop) |
-| `anti_rotation` | Core stability movements (plank, dead bug, bird dog, Pallof press) |
-| `carry` | Loaded carrying patterns (farmer's walk, suitcase carry) |
-| `cardio` | Cardiovascular conditioning (running, cycling, rowing, burpees) |
-| `mobility` | Flexibility and mobility work (stretches, foam rolling) |
-| `balance` | Balance and stability training |
-
-### Classification Pipeline
-
-Classification is performed by `ExerciseClassificationService` using a heuristic pipeline:
-
-1. Name-based keyword matching — primary signal (150+ pattern rules)
-2. rawBodyPart + rawTarget fallback — used when name matching fails
-3. Safe defaults — applied when no signal is available
-
-The classification runs during import and assigns all enriched taxonomy fields automatically. Hand-authored exercises preserve their existing taxonomy when enriched.
-
-### isEnriched Flag
-
-The `isEnriched` flag is a computed boolean returned by the API (not stored in DB):
-
-```
-isEnriched = (external_source IS NOT NULL AND last_synced_at IS NOT NULL)
-```
-
-This indicates whether the exercise was imported from an external source.
-
-9. exercise_substitutions
-
+### 5.3 exercise_substitutions
 Stores possible substitute exercises.
 
-Column	Type	Constraints	Description
-id	UUID	PK	Unique record identifier
-exercise_id	UUID	FK → exercises.id, NOT NULL	Original exercise
-substitute_exercise_id	UUID	FK → exercises.id, NOT NULL	Substitute exercise
-priority_rank	INTEGER	DEFAULT 1	Ranking of substitution preference
-notes	TEXT	NULL	Optional substitution logic
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-
-Unique Constraint
-
-(exercise_id, substitute_exercise_id)
-
-10. exercise_prescriptions
-
-Stores exercise templates assigned to a workout day.
-
-Column	Type	Constraints	Description
-id	UUID	PK	Unique prescription identifier
-workout_day_id	UUID	FK → workout_days.id, NOT NULL	Parent workout day
-exercise_id	UUID	FK → exercises.id, NOT NULL	Referenced exercise
-target_rep_range	VARCHAR(50)	NULL	Example: 4-6, 8-12, 12-15
-increment_value	NUMERIC(6,2)	DEFAULT 0	Suggested weight increase
-increment_unit	VARCHAR(20)	DEFAULT 'lb'	lb or kg
-notes	TEXT	NULL	Prescription notes
-sort_order	INTEGER	NOT NULL	Exercise order in workout
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-
-Indexes
-
-index on workout_day_id
-
-index on exercise_id
-
-index on sort_order
-
-11. user_program_assignments
-
-Assigns a program to a user.
-
-Column	Type	Constraints	Description
-id	UUID	PK	Unique assignment identifier
-user_id	UUID	FK → users.id, NOT NULL	Assigned user
-program_id	UUID	FK → programs.id, NOT NULL	Assigned program
-assigned_at	TIMESTAMP	NOT NULL	Assignment date
-start_date	DATE	NULL	Start date
-end_date	DATE	NULL	End date
-is_active	BOOLEAN	DEFAULT true	Active assignment
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-
-Indexes
-
-index on user_id
-
-index on program_id
-
-12. training_logs
-
-Stores actual user performance for a prescribed exercise.
-
-Column	Type	Constraints	Description
-id	UUID	PK	Unique log identifier
-user_id	UUID	FK → users.id, NOT NULL	User performing workout
-program_id	UUID	FK → programs.id, NULL	Program context
-program_week_id	UUID	FK → program_weeks.id, NULL	Week context
-workout_day_id	UUID	FK → workout_days.id, NULL	Workout day context
-exercise_prescription_id	UUID	FK → exercise_prescriptions.id, NULL	Template source
-exercise_id	UUID	FK → exercises.id, NOT NULL	Logged exercise
-session_date	DATE	NOT NULL	Date of session
-weight	NUMERIC(8,2)	NULL	Weight used
-weight_unit	VARCHAR(20)	DEFAULT 'lb'	Weight unit
-set_1_reps	INTEGER	NULL	Reps in set 1
-set_2_reps	INTEGER	NULL	Reps in set 2
-set_3_reps	INTEGER	NULL	Reps in set 3
-set_4_reps	INTEGER	NULL	Reps in set 4
-rir	INTEGER	NULL	Reps in reserve
-total_reps	INTEGER	NULL	Calculated total reps
-lower_rep	INTEGER	NULL	Parsed lower rep threshold
-upper_rep	INTEGER	NULL	Parsed upper rep threshold
-ready_to_increase	BOOLEAN	NULL	Progression flag
-next_weight	NUMERIC(8,2)	NULL	Suggested next weight
-status	VARCHAR(20)	NULL	ACHIEVED, PROGRESS, FAILED
-notes	TEXT	NULL	Session notes
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-
-Indexes
-
-index on user_id
-
-index on session_date
-
-index on exercise_id
-
-index on status
-
-13. body_metrics
-
-Stores daily or periodic body/recovery metrics.
-
-Column	Type	Constraints	Description
-id	UUID	PK	Unique metric entry
-user_id	UUID	FK → users.id, NOT NULL	Owner
-entry_date	DATE	NOT NULL	Entry date
-body_weight	NUMERIC(6,2)	NULL	Body weight
-body_weight_unit	VARCHAR(20)	DEFAULT 'kg'	Unit
-calories	INTEGER	NULL	Daily calories
-protein_grams	INTEGER	NULL	Protein intake
-sleep_hours	NUMERIC(4,2)	NULL	Sleep duration
-hunger_score	INTEGER	NULL	Hunger 1–10
-binge_urge_score	INTEGER	NULL	Binge urge 1–10
-mood_score	INTEGER	NULL	Mood 1–10
-training_performance_score	INTEGER	NULL	Performance 1–10
-notes	TEXT	NULL	Optional notes
-created_at	TIMESTAMP	NOT NULL	Created timestamp
-updated_at	TIMESTAMP	NOT NULL	Updated timestamp
-
-Unique Constraint
-
-(user_id, entry_date)
-
-Progression Logic Notes
-
-The following fields in training_logs should be computed by the backend service layer, not trusted from the client:
-
-total_reps
-
-lower_rep
-
-upper_rep
-
-ready_to_increase
-
-next_weight
-
-status
-
-Logic Rules
-Parse rep range
-
-Examples:
-
-4-6 → lower = 4, upper = 6
-
-8-12 → lower = 8, upper = 12
-
-12-15 → lower = 12, upper = 15
-
-Total reps
-total_reps = set_1_reps + set_2_reps + set_3_reps + set_4_reps
-Ready to increase
-ready_to_increase = true if all completed sets >= upper_rep
-Status
-ACHIEVED = all sets >= upper_rep
-PROGRESS = all sets >= lower_rep but not all >= upper_rep
-FAILED = any set < lower_rep
-Next weight
-if ready_to_increase = true:
-    next_weight = weight + increment_value
-else:
-    next_weight = weight
-Cardio / Rest rows
-
-For non-lifting prescriptions:
-
-rep range may be null
-
-progression fields may remain null
-
-status may remain null
-
-Recommended Enums
-
-These can be implemented as PostgreSQL enums or validated string fields.
-
-role_name
-
-admin
-
-user
-
-coach
-
-phase
-
-Strength
-
-Hypertrophy
-
-Cardio
-
-Rest
-
-status
-
-ACHIEVED
-
-PROGRESS
-
-FAILED
-
-increment_unit / weight_unit
-
-lb
-
-kg
-
-Suggested Indexing Strategy
-
-High-priority indexes:
-
-users.email
-
-refresh_tokens.user_id
-
-training_logs.user_id
-
-training_logs.exercise_id
-
-training_logs.session_date
-
-body_metrics.user_id
-
-body_metrics.entry_date
-
-exercise_prescriptions.workout_day_id
-
-workout_days.program_week_id
-
-Composite indexes to consider:
-
-(user_id, session_date) on training_logs
-
-(user_id, exercise_id, session_date) on training_logs
-
-(user_id, entry_date) on body_metrics
-
-Soft Delete Strategy
-
-Recommended for these tables:
-
-users
-
-programs
-
-exercises
-
-Possible implementation:
-
-deleted_at TIMESTAMP NULL
-
-Not necessary for:
-
-training_logs
-
-body_metrics
-
-refresh_tokens
-
-Those are better treated as historical records.
-
-Seeding Recommendations
-
-Initial seed data should include:
-
-roles
-
-admin
-
-user
-
-coach
-
-exercises
-
-Bench Press
-
-Weighted Pull-ups
-
-Overhead Press
-
-Barbell Row
-
-Back Squat
-
-Romanian Deadlift
-
-Leg Press
-
-Hamstring Curl
-
-Incline DB Press
-
-Lat Pulldown
-
-DB Shoulder Press
-
-Lateral Raise
-
-Cable Row
-
-Fly Machine
-
-Deadlift
-
-Bulgarian Split Squat
-
-Hip Thrust
-
-Leg Extension
-
-Seated Ham Curl
-
-Calf Raise
-
-Zone 2 Cardio
-
-HIIT
-
-Walk + Stretch
-
-program
-
-Apex Protocol 12 Week Base Program
-
-program structure
-
-3 months
-
-12 weeks
-
-all workout days
-
-all exercise prescriptions
-
-sample user
-
-one development user account
-
-Future Expansion
-
-This schema is designed to support future additions such as:
-
-coach-to-athlete relationships
-
-shared templates
-
-custom user programs
-
-exercise history charts
-
-notifications and reminders
-
-training adherence analytics
-
-wearable integrations
-
-AI-generated recommendations
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record identifier |
+| exercise_id | UUID | FK → exercises.id | Original exercise |
+| substitute_exercise_id | UUID | FK → exercises.id | Substitute exercise |
+| priority_rank | INTEGER | DEFAULT 1 | Ranking of preference |
+| notes | TEXT | NULL | Optional substitution logic |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+
+### 5.4 user_exercise_weights
+Stores per-user working weights.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record |
+| user_id | UUID | FK → users.id | User |
+| exercise_id | UUID | FK → exercises.id | Exercise |
+| current_weight | NUMERIC(8,2) | NOT NULL | Latest confirmed weight |
+| weight_unit | VARCHAR(20) | DEFAULT kg | lb or kg |
+| preferred_increment_pct| DOUBLE PRECISION | DEFAULT 2.5 | Default progression increment |
+| confirmed_at | TIMESTAMP | NOT NULL | Date of confirmation |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
+
+### 5.5 exercise_preferences
+User-specific preferences to influence recommendation engine.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique preference identifier |
+| user_id | UUID | FK → users.id | User |
+| exercise_id | UUID | FK → exercises.id | Exercise |
+| preference_type | VARCHAR(30) | NOT NULL | more_often, less_often, exclude |
+| source | VARCHAR(50) | NULL | UI / engine / onboarding |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
+
+---
+
+## 6. Workout Execution (Runtime)
+
+### 6.1 workout_sessions
+Live or historical workout instances.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| user_id | UUID | FK → users.id | Owner |
+| workout_day_id | UUID | FK → workout_days.id, NULL | Template source |
+| status | VARCHAR(30) | NOT NULL | in_progress, completed, abandoned |
+| started_at | TIMESTAMP | NOT NULL | Session start |
+| finished_at | TIMESTAMP | NULL | Session end |
+| duration_sec | INTEGER | NULL | Total duration |
+| elapsed_active_sec | INTEGER | NULL | Active time excluding pauses |
+| total_volume | NUMERIC(12,2) | NULL | Total weight shifted |
+| estimated_calories | NUMERIC(8,2) | NULL | Estimated burn |
+| completed_exercise_count | INTEGER | DEFAULT 0 | Count finished |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
+
+### 6.2 workout_session_exercises
+Exercises performed in a live session.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| workout_session_id | UUID | FK → workout_sessions.id | Parent session |
+| exercise_prescription_id | UUID | FK → specifications.id, NULL | Template source |
+| exercise_id | UUID | FK → exercises.id | Actual exercise |
+| order_index | INTEGER | NOT NULL | Sequence order |
+| is_focus_exercise | BOOLEAN | DEFAULT false | Primary movement |
+| recommended_rest_sec | INTEGER | NULL | Rest duration |
+| was_replaced | BOOLEAN | DEFAULT false | substitution flag |
+| replacement_reason | VARCHAR(100) | NULL | Optional reason |
+| completed_at | TIMESTAMP | NULL | Completion time |
+
+### 6.3 logged_sets
+Set-level execution data.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| workout_session_exercise_id | UUID | FK → session_exercises.id | Parent entry |
+| set_type | VARCHAR(20) | NOT NULL | warmup, working |
+| set_order | INTEGER | NOT NULL | Sequence |
+| target_reps | INTEGER | NULL | Planned reps |
+| actual_reps | INTEGER | NULL | Completed reps |
+| target_weight | NUMERIC(8,2) | NULL | Planned weight |
+| actual_weight | NUMERIC(8,2) | NULL | Completed weight |
+| unit | VARCHAR(20) | DEFAULT lb | Weight unit |
+| rir | INTEGER | NULL | Reps in reserve |
+| completed | BOOLEAN | DEFAULT false | Completion flag |
+| skipped | BOOLEAN | DEFAULT false | Skipped flag |
+| rest_after_sec | INTEGER | NULL | Actual rest taken |
+| completed_at | TIMESTAMP | NULL | Completion timestamp |
+
+### 6.4 workout_session_events
+Timer and interaction telemetry.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique event identifier |
+| workout_session_id | UUID | FK → workout_sessions.id | Parent session |
+| workout_session_exercise_id | UUID | FK → session_exercises.id, NULL | Related exercise |
+| event_type | VARCHAR(50) | NOT NULL | rest_started, rest_completed, etc. |
+| payload | JSONB | NULL | Additional metadata |
+| occurred_at | TIMESTAMP | NOT NULL | Event time |
+
+### 6.5 workout_summaries
+Snapshots of completed workouts for history views.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique summary identifier |
+| workout_session_id | UUID | FK → workout_sessions.id, UNIQUE | Source session |
+| user_id | UUID | FK → users.id | Owner |
+| workout_name | VARCHAR(255) | NOT NULL | Snapshot title |
+| performed_at | TIMESTAMP | NOT NULL | Finish time |
+| total_volume | NUMERIC(12,2) | NULL | Total volume |
+| summary_payload | JSONB | NULL | Snapshot display data |
+
+---
+
+## 7. Progress & Analytics
+
+### 7.1 weekly_progress
+Aggregated weekly consistency.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique record |
+| user_id | UUID | FK → users.id | Owner |
+| week_start_date | DATE | NOT NULL | Tracking week (Monday) |
+| weekly_goal | INTEGER | NOT NULL | Target sessions |
+| workouts_completed | INTEGER | DEFAULT 0 | Count finished |
+| remaining_to_goal | INTEGER | DEFAULT 0 | Workouts left to hit goal |
+| streak_count | INTEGER | DEFAULT 0 | Current habit streak |
+| milestone_state | JSONB | NULL | State tracking for badges/locks |
+| created_at | TIMESTAMP | NOT NULL | Created timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Updated timestamp |
+
+### 7.2 body_metrics
+Historical physiological data.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| user_id | UUID | FK → users.id | Owner |
+| entry_date | DATE | NOT NULL | Date |
+| body_weight | NUMERIC(6,2) | NULL | Weight |
+| calories | INTEGER | NULL | Daily calories |
+| protein_grams | INTEGER | NULL | Protein intake |
+
+### 7.3 training_logs (Legacy/Snapshots)
+Backward-compatible flattened records.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK | Unique identifier |
+| workout_session_id | UUID | FK → workout_sessions.id | source session |
+| weight | NUMERIC(8,2) | NULL | Top set weight |
+| status | VARCHAR(20) | NULL | ACHIEVED, PROGRESS, FAILED |
+
+---
+
+## Architecture & Logic Notes
+
+### Progression Logic
+- **ACHIEVED**: All sets >= planned upper rep range.
+- **PROGRESS**: All sets >= lower rep range; not all >= upper.
+- **FAILED**: Any set < lower rep range.
+- **Next weight**: Computed as `current_weight + increment` only if status is ACHIEVED.
+
+### Volume Calculation
+- **set_volume** = `actual_weight` * `actual_reps`
+- **total_volume** = `sum(all completed weighted working sets)`
+
+### Template vs Runtime
+Planned workouts (templates) in `exercise_prescriptions` are decoupled from live execution in `workout_session_exercises`. This allows users to substitute exercises or modify set counts on the fly without altering the underlying program.
+
+---
+
+## Seeding Recommendations
+
+### Initial Core Data
+- **roles**: admin, user, coach.
+- **equipment_presets**: Commercial Gym, Small Gym, Home Gym, Minimal Home, Bodyweight Only.
+- **exercises**: Bench Press, Squat, Deadlift, Pull-up, OHP, etc.
+- **program**: "Apex Protocol 12 Week Base Program" with 12 weeks of assigned days.
+
+### Sample User State
+- One development user account.
+- One onboarding profile context.
+- One generated program assignment.
+- One mock workout session (completed).
+
+---
+
+## Migration Strategy (Evolutionary)
+
+If evolving from the legacy flattened schema, follow this sequence:
+1. **Maintain** template tables (`programs`, `workout_days`, `prescriptions`).
+2. **Add** runtime tables (`workout_sessions`, `session_exercises`, `logged_sets`).
+3. **Add** profiling layer (`onboarding_profiles`, `user_profiles`, `equipment_profiles`).
+4. **Backfill** nullable foreign keys to link historical `training_logs` to `workout_sessions`.
+5. **Deprecate** direct `training_logs` writes only after session-based logging is verified stable.

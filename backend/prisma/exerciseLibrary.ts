@@ -1779,6 +1779,316 @@ const BALANCE_EXERCISES: ExerciseDefinition[] = [
   },
 ];
 
+// ─── N. LANDMINE EXERCISES ────────────────────────────────────────────────────
+
+const LANDMINE_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Landmine Press',
+    category: 'compound', muscleGroup: 'Shoulders', equipment: 'barbell',
+    bodyPart: 'Upper Body', primaryMuscle: 'Anterior Deltoid',
+    secondaryMuscles: ['Triceps', 'Core', 'Chest'],
+    movementPattern: 'vertical_push', exerciseType: 'compound',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: true,
+  },
+  {
+    name: 'Landmine Row',
+    category: 'compound', muscleGroup: 'Back', equipment: 'barbell',
+    bodyPart: 'Upper Body', primaryMuscle: 'Latissimus Dorsi',
+    secondaryMuscles: ['Rhomboids', 'Trapezius', 'Biceps'],
+    movementPattern: 'horizontal_pull', exerciseType: 'compound',
+    goalTags: ['hypertrophy', 'strength'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: true,
+  },
+  {
+    name: 'Landmine Squat',
+    category: 'compound', muscleGroup: 'Quads', equipment: 'barbell',
+    bodyPart: 'Lower Body', primaryMuscle: 'Quadriceps',
+    secondaryMuscles: ['Glutes', 'Hamstrings', 'Core'],
+    movementPattern: 'squat', exerciseType: 'compound',
+    goalTags: ['hypertrophy', 'general_fitness'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Landmine Rotation',
+    category: 'core', muscleGroup: 'Core', equipment: 'barbell',
+    bodyPart: 'Core', primaryMuscle: 'Obliques',
+    secondaryMuscles: ['Shoulders', 'Core'],
+    movementPattern: 'anti_rotation', exerciseType: 'core',
+    goalTags: ['athletic_performance', 'strength'],
+    difficulty: 'intermediate', isCompound: false, isUnilateral: false,
+  },
+];
+
+// ─── O. TRX / SUSPENSION EXERCISES ────────────────────────────────────────────
+
+const TRX_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'TRX Row',
+    category: 'compound', muscleGroup: 'Back', equipment: 'mixed',
+    bodyPart: 'Upper Body', primaryMuscle: 'Latissimus Dorsi',
+    secondaryMuscles: ['Rhomboids', 'Biceps', 'Core'],
+    movementPattern: 'horizontal_pull', exerciseType: 'compound',
+    goalTags: ['hypertrophy', 'general_fitness'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'TRX Push-up',
+    category: 'compound', muscleGroup: 'Chest', equipment: 'mixed',
+    bodyPart: 'Upper Body', primaryMuscle: 'Pectoralis Major',
+    secondaryMuscles: ['Triceps', 'Anterior Deltoid', 'Core'],
+    movementPattern: 'horizontal_push', exerciseType: 'compound',
+    goalTags: ['hypertrophy', 'athletic_performance'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'TRX Fallout',
+    category: 'core', muscleGroup: 'Core', equipment: 'mixed',
+    bodyPart: 'Core', primaryMuscle: 'Core',
+    secondaryMuscles: ['Shoulders', 'Lats'],
+    movementPattern: 'anti_rotation', exerciseType: 'core',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: false, isUnilateral: false,
+  },
+  {
+    name: 'TRX Hamstring Curl',
+    category: 'isolation', muscleGroup: 'Hamstrings', equipment: 'mixed',
+    bodyPart: 'Lower Body', primaryMuscle: 'Hamstrings',
+    secondaryMuscles: ['Glutes', 'Core'],
+    movementPattern: 'hinge', exerciseType: 'isolation',
+    goalTags: ['hypertrophy', 'athletic_performance'],
+    difficulty: 'intermediate', isCompound: false, isUnilateral: false,
+  },
+];
+
+// ─── P. BOSU EXERCISES ────────────────────────────────────────────────────────
+
+const BOSU_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'BOSU Squat',
+    category: 'compound', muscleGroup: 'Quads', equipment: 'mixed',
+    bodyPart: 'Lower Body', primaryMuscle: 'Quadriceps',
+    secondaryMuscles: ['Glutes', 'Core', 'Ankles'],
+    movementPattern: 'squat', exerciseType: 'compound',
+    goalTags: ['balance', 'general_fitness'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'BOSU Push-up',
+    category: 'compound', muscleGroup: 'Chest', equipment: 'mixed',
+    bodyPart: 'Upper Body', primaryMuscle: 'Pectoralis Major',
+    secondaryMuscles: ['Triceps', 'Core'],
+    movementPattern: 'horizontal_push', exerciseType: 'compound',
+    goalTags: ['hypertrophy', 'balance'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'BOSU Mountain Climber',
+    category: 'cardio', muscleGroup: 'Core', equipment: 'mixed',
+    bodyPart: 'Full Body', primaryMuscle: 'Core',
+    secondaryMuscles: ['Shoulders', 'Hip Flexors'],
+    movementPattern: 'cardio', exerciseType: 'cardio',
+    goalTags: ['fat_loss', 'balance'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: false,
+  },
+];
+
+// ─── Q. BAND EXERCISES ────────────────────────────────────────────────────────
+
+const BAND_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Banded Face Pull',
+    category: 'isolation', muscleGroup: 'Shoulders', equipment: 'band',
+    bodyPart: 'Upper Body', primaryMuscle: 'Posterior Deltoid',
+    secondaryMuscles: ['Rhomboids', 'Trapezius'],
+    movementPattern: 'horizontal_pull', exerciseType: 'isolation',
+    goalTags: ['hypertrophy', 'mobility_recovery'],
+    difficulty: 'beginner', isCompound: false, isUnilateral: false,
+  },
+  {
+    name: 'Banded Pull-apart',
+    category: 'isolation', muscleGroup: 'Shoulders', equipment: 'band',
+    bodyPart: 'Upper Body', primaryMuscle: 'Posterior Deltoid',
+    secondaryMuscles: ['Rhomboids'],
+    movementPattern: 'horizontal_pull', exerciseType: 'isolation',
+    goalTags: ['mobility_recovery', 'hypertrophy'],
+    difficulty: 'beginner', isCompound: false, isUnilateral: false,
+  },
+  {
+    name: 'Banded Bicep Curl',
+    category: 'isolation', muscleGroup: 'Biceps', equipment: 'band',
+    bodyPart: 'Upper Body', primaryMuscle: 'Biceps Brachii',
+    secondaryMuscles: [],
+    movementPattern: 'vertical_pull', exerciseType: 'isolation',
+    goalTags: ['hypertrophy', 'general_fitness'],
+    difficulty: 'beginner', isCompound: false, isUnilateral: false,
+  },
+  {
+    name: 'Banded Lateral Raise',
+    category: 'isolation', muscleGroup: 'Shoulders', equipment: 'band',
+    bodyPart: 'Upper Body', primaryMuscle: 'Lateral Deltoid',
+    secondaryMuscles: [],
+    movementPattern: 'vertical_push', exerciseType: 'isolation',
+    goalTags: ['hypertrophy'],
+    difficulty: 'beginner', isCompound: false, isUnilateral: false,
+  },
+];
+
+// ─── R. KETTLEBELL EXERCISES ──────────────────────────────────────────────────
+
+const KETTLEBELL_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Kettlebell Snatch',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'kettlebell',
+    bodyPart: 'Full Body', primaryMuscle: 'Glutes',
+    secondaryMuscles: ['Hamstrings', 'Back', 'Shoulders', 'Core'],
+    movementPattern: 'hinge', exerciseType: 'plyometric',
+    goalTags: ['athletic_performance', 'power', 'endurance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: true,
+  },
+  {
+    name: 'Kettlebell Clean',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'kettlebell',
+    bodyPart: 'Full Body', primaryMuscle: 'Glutes',
+    secondaryMuscles: ['Hamstrings', 'Back', 'Shoulders', 'Core'],
+    movementPattern: 'hinge', exerciseType: 'compound',
+    goalTags: ['athletic_performance', 'strength'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: true,
+  },
+  {
+    name: 'Turkish Get-Up',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'kettlebell',
+    bodyPart: 'Full Body', primaryMuscle: 'Core',
+    secondaryMuscles: ['Shoulders', 'Hips', 'Glutes', 'Back'],
+    movementPattern: 'mobility', exerciseType: 'compound',
+    goalTags: ['mobility_recovery', 'strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: true,
+  },
+  {
+    name: 'Kettlebell Windmill',
+    category: 'isolation', muscleGroup: 'Core', equipment: 'kettlebell',
+    bodyPart: 'Core', primaryMuscle: 'Obliques',
+    secondaryMuscles: ['Shoulders', 'Hamstrings', 'Core'],
+    movementPattern: 'anti_rotation', exerciseType: 'isolation',
+    goalTags: ['mobility_recovery', 'hypertrophy'],
+    difficulty: 'intermediate', isCompound: false, isUnilateral: true,
+  },
+  {
+    name: 'Renegade Row',
+    category: 'compound', muscleGroup: 'Back', equipment: 'kettlebell',
+    bodyPart: 'Upper Body', primaryMuscle: 'Latissimus Dorsi',
+    secondaryMuscles: ['Core', 'Shoulders', 'Biceps'],
+    movementPattern: 'horizontal_pull', exerciseType: 'compound',
+    goalTags: ['strength', 'hypertrophy', 'athletic_performance'],
+    difficulty: 'intermediate', isCompound: true, isUnilateral: true,
+  },
+];
+
+// ─── S. STRONGMAN EXERCISES ───────────────────────────────────────────────────
+
+const STRONGMAN_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Atlas Stones',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'mixed',
+    bodyPart: 'Full Body', primaryMuscle: 'Glutes',
+    secondaryMuscles: ['Hamstrings', 'Erector Spinae', 'Biceps', 'Core'],
+    movementPattern: 'hinge', exerciseType: 'compound',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Tire Flip',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'mixed',
+    bodyPart: 'Full Body', primaryMuscle: 'Quadriceps',
+    secondaryMuscles: ['Glutes', 'Hamstrings', 'Back', 'Shoulders', 'Core'],
+    movementPattern: 'squat', exerciseType: 'plyometric',
+    goalTags: ['strength', 'athletic_performance', 'fat_loss'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Log Press',
+    category: 'compound', muscleGroup: 'Shoulders', equipment: 'mixed',
+    bodyPart: 'Upper Body', primaryMuscle: 'Shoulders',
+    secondaryMuscles: ['Triceps', 'Upper Back', 'Core'],
+    movementPattern: 'vertical_push', exerciseType: 'compound',
+    goalTags: ['strength', 'power'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+];
+
+// ─── T. GYMNASTICS / BODYWEIGHT SKILLS ────────────────────────────────────────
+
+const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Muscle-Up',
+    category: 'compound', muscleGroup: 'Full Body', equipment: 'bodyweight',
+    bodyPart: 'Upper Body', primaryMuscle: 'Latissimus Dorsi',
+    secondaryMuscles: ['Triceps', 'Chest', 'Shoulders', 'Biceps', 'Core'],
+    movementPattern: 'vertical_pull', exerciseType: 'compound',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'L-Sit',
+    category: 'core', muscleGroup: 'Core', equipment: 'bodyweight',
+    bodyPart: 'Core', primaryMuscle: 'Rectus Abdominis',
+    secondaryMuscles: ['Hip Flexors', 'Triceps', 'Shoulders'],
+    movementPattern: 'anti_rotation', exerciseType: 'core',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'intermediate', isCompound: false, isUnilateral: false,
+  },
+  {
+    name: 'Planche Push-up',
+    category: 'compound', muscleGroup: 'Chest', equipment: 'bodyweight',
+    bodyPart: 'Upper Body', primaryMuscle: 'Anterior Deltoid',
+    secondaryMuscles: ['Chest', 'Triceps', 'Core'],
+    movementPattern: 'horizontal_push', exerciseType: 'compound',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Front Lever',
+    category: 'compound', muscleGroup: 'Back', equipment: 'bodyweight',
+    bodyPart: 'Upper Body', primaryMuscle: 'Latissimus Dorsi',
+    secondaryMuscles: ['Core', 'Shoulders', 'Biceps'],
+    movementPattern: 'vertical_pull', exerciseType: 'compound',
+    goalTags: ['strength', 'athletic_performance'],
+    difficulty: 'advanced', isCompound: true, isUnilateral: false,
+  },
+];
+
+// ─── U. ANIMAL FLOW / MOVEMENT SECTIONS ───────────────────────────────────────
+
+const ANIMAL_FLOW_EXERCISES: ExerciseDefinition[] = [
+  {
+    name: 'Bear Crawl',
+    category: 'cardio', muscleGroup: 'Full Body', equipment: 'bodyweight',
+    bodyPart: 'Full Body', primaryMuscle: 'Core',
+    secondaryMuscles: ['Shoulders', 'Quadriceps', 'Hips'],
+    movementPattern: 'cardio', exerciseType: 'cardio',
+    goalTags: ['athletic_performance', 'fat_loss', 'mobility_recovery'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Crab Walk',
+    category: 'cardio', muscleGroup: 'Full Body', equipment: 'bodyweight',
+    bodyPart: 'Full Body', primaryMuscle: 'Triceps',
+    secondaryMuscles: ['Glutes', 'Shoulders', 'Core'],
+    movementPattern: 'cardio', exerciseType: 'cardio',
+    goalTags: ['athletic_performance', 'fat_loss', 'mobility_recovery'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: false,
+  },
+  {
+    name: 'Frog Jump',
+    category: 'compound', muscleGroup: 'Quads', equipment: 'bodyweight',
+    bodyPart: 'Lower Body', primaryMuscle: 'Quadriceps',
+    secondaryMuscles: ['Glutes', 'Calves', 'Core'],
+    movementPattern: 'squat', exerciseType: 'plyometric',
+    goalTags: ['athletic_performance', 'fat_loss'],
+    difficulty: 'beginner', isCompound: true, isUnilateral: false,
+  },
+];
+
 // ─── Full library export ───────────────────────────────────────────────────────
 
 export const EXERCISE_LIBRARY: ExerciseDefinition[] = [
@@ -1795,6 +2105,14 @@ export const EXERCISE_LIBRARY: ExerciseDefinition[] = [
   ...CARDIO_EXERCISES,
   ...MOBILITY_EXERCISES,
   ...BALANCE_EXERCISES,
+  ...LANDMINE_EXERCISES,
+  ...TRX_EXERCISES,
+  ...BOSU_EXERCISES,
+  ...BAND_EXERCISES,
+  ...KETTLEBELL_EXERCISES,
+  ...STRONGMAN_EXERCISES,
+  ...GYMNASTICS_EXERCISES,
+  ...ANIMAL_FLOW_EXERCISES,
 ];
 
 // ─── Substitutions ─────────────────────────────────────────────────────────────
