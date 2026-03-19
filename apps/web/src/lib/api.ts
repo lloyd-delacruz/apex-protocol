@@ -18,8 +18,8 @@ const USER_KEY = 'apex_user';
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
 export function getToken(): string | null {
-  // BYPASS AUTH
-  return 'dummy-token';
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 export function saveAuth(token: string, user: unknown, refreshToken?: string) {
@@ -51,25 +51,33 @@ export function getStoredUser<T = { id: string; email: string; name: string }>()
 // Guards against concurrent refresh attempts
 let isRefreshing = false;
 
-async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** When true, a 401/403 will throw silently instead of redirecting to /login */
+  silent?: boolean;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
+  const { silent, ...fetchOptions } = options;
   const token = getToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> ?? {}),
+    ...(fetchOptions.headers as Record<string, string> ?? {}),
   };
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers });
 
-  // Handle token expiry — attempt one silent refresh then retry
+  // Handle token expiry — attempt one silent refresh then redirect to login
   if ((res.status === 401 || res.status === 403) && !isRetry && !isRefreshing) {
-    // BYPASS AUTH FOR LOCAL TESTING: Don't logout on 401/403, just log it.
-    console.warn('Auth bypassed: Ignoring 401/403 response.');
-    /*
+    // Silent callers (e.g. background onboarding sync) should not redirect
+    if (silent) {
+      throw new Error('Authentication required');
+    }
+
     const storedRefreshToken = typeof window !== 'undefined'
       ? localStorage.getItem(REFRESH_TOKEN_KEY)
       : null;
@@ -88,7 +96,6 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
           if (data.success && data.data) {
             saveAuth(data.data.token, data.data.user, data.data.refreshToken);
             isRefreshing = false;
-            // Retry the original request with the new token
             return request<T>(path, options, true);
           }
         }
@@ -99,11 +106,9 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
       }
     }
 
-    // Refresh failed or no refresh token available — clear and redirect
     clearAuth();
     if (typeof window !== 'undefined') window.location.href = '/';
     throw new Error('Authentication required');
-    */
   }
 
   const json = await res.json();
@@ -202,6 +207,36 @@ export const api = {
 
     getByWeekAndDay: (programId: string, week: number, day: number) =>
       request<{ workoutDay: ApiWorkoutDay }>(`/api/workouts/${programId}/${week}/${day}`),
+
+    startSession: (workoutDayId?: string) =>
+      request<{ session: ApiWorkoutSession; sessionExercises: ApiSessionExercise[] }>(
+        '/api/workouts/session/start',
+        { method: 'POST', body: JSON.stringify({ workoutDayId }) }
+      ),
+
+    finishSession: (sessionId: string, notes?: string) =>
+      request<ApiWorkoutSession>('/api/workouts/session/finish', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId, notes }),
+      }),
+
+    addSessionExercise: (sessionId: string, exerciseId: string, orderIndex: number) =>
+      request<ApiSessionExercise>('/api/workouts/session/exercises', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId, exerciseId, orderIndex }),
+      }),
+
+    updateSessionExercise: (sessionExerciseId: string, exerciseId: string) =>
+      request<ApiSessionExercise>(`/api/workouts/session/exercises/${sessionExerciseId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ exerciseId }),
+      }),
+
+    logSet: (sessionExerciseId: string, data: LogSetInput) =>
+      request<ApiLoggedSet>(`/api/workouts/session/exercises/${sessionExerciseId}/sets`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 
   // ─── Training Log ──────────────────────────────────────────────────────────
@@ -326,6 +361,32 @@ export const api = {
         '/api/progression/suggested-weights',
         { method: 'POST', body: JSON.stringify({ exerciseIds }) }
       ),
+  },
+
+  // ─── Profiles ─────────────────────────────────────────────────────────────
+
+  profiles: {
+    getOnboarding: () =>
+      request<ApiOnboardingProfile | null>('/api/profiles/onboarding'),
+
+    saveOnboarding: (data: any) =>
+      request<ApiOnboardingProfile>('/api/profiles/onboarding', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        silent: true,
+      }),
+
+    saveUser: (data: any) =>
+      request<any>('/api/profiles/user', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    saveNotifications: (data: any) =>
+      request<any>('/api/profiles/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 };
 
@@ -454,6 +515,54 @@ export interface ApiTodayWorkout {
   message?: string;
 }
 
+export interface ApiWorkoutSession {
+  id: string;
+  userId: string;
+  workoutDayId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  status: 'in_progress' | 'completed' | 'abandoned';
+  durationSec: number | null;
+  totalVolume: string | null;
+  estimatedCalories: number | null;
+  completedExerciseCount: number;
+  notes: string | null;
+}
+
+export interface ApiOnboardingProfile {
+  id: string;
+  userId: string | null;
+  goal: string | null;
+  consistency: string | null;
+  experience: string | null;
+  environment: string | null;
+  workoutsPerWeek: number | null;
+  specificDays: any | null;
+  bodyStatsSnapshot: any | null;
+  notificationOptIn: boolean;
+  notificationTime: string | null;
+  completedAt: string | null;
+  equipmentProfiles?: ApiEquipmentProfile[];
+}
+
+export interface ApiEquipmentProfile {
+  id: string;
+  userId: string | null;
+  onboardingProfileId: string | null;
+  name: string;
+  environmentType: string | null;
+  isDefault: boolean;
+  items: ApiEquipmentProfileItem[];
+}
+
+export interface ApiEquipmentProfileItem {
+  id: string;
+  equipmentProfileId: string;
+  equipmentCode: string;
+  label: string;
+  metadata: any | null;
+}
+
 export interface ApiTrainingLog {
   id: string;
   userId: string;
@@ -545,6 +654,46 @@ export interface TrainingLogInput {
   set3Reps?: number;
   set4Reps?: number;
   notes?: string;
+}
+
+export interface LogSetInput {
+  setType?: 'working' | 'warmup' | 'dropset';
+  setOrder: number;
+  targetReps?: number;
+  actualReps?: number;
+  targetWeight?: number;
+  actualWeight?: number;
+  unit?: string;
+  rir?: number;
+  rpe?: number;
+  completed?: boolean;
+  restAfterSec?: number;
+}
+
+export interface ApiSessionExercise {
+  id: string;
+  sessionId: string;
+  exerciseId: string;
+  workoutExerciseId: string | null; // stores the exercisePrescription.id for mapping
+  orderIndex: number;
+  wasReplaced: boolean;
+}
+
+export interface ApiLoggedSet {
+  id: string;
+  sessionExerciseId: string;
+  setType: string;
+  setOrder: number;
+  targetReps: number | null;
+  actualReps: number | null;
+  targetWeight: string | null;
+  actualWeight: string | null;
+  unit: string;
+  rir: number | null;
+  rpe: string | null;
+  completed: boolean;
+  completedAt: string | null;
+  restAfterSec: number | null;
 }
 
 export interface MetricsInput {

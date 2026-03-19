@@ -11,6 +11,7 @@ import analyticsRouter from './routes/analytics';
 import progressionRouter from './routes/progression';
 import exercisesRouter from './routes/exercises';
 import adminRouter from './routes/admin';
+import profilesRouter from './routes/profiles';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/progression', progressionRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/profiles', profilesRouter);
 
 // Legacy route aliases (backward compat with existing frontend)
 app.use('/auth', authLimiter, authRouter);

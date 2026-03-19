@@ -50,6 +50,10 @@ model User {
   workoutSessions        WorkoutSession[]
   exercisePreferences    ExercisePreference[]
   weeklyProgress         WeeklyProgress[]
+  userProfile            UserProfile?
+  onboardingProfile      OnboardingProfile?
+  notificationPreference NotificationPreference?
+  equipmentProfiles      EquipmentProfile[]
 
   @@index([roleId])
   @@map("users")
@@ -476,4 +480,94 @@ model WeeklyProgress {
 
   @@unique([userId, weekStartDate])
   @@map("weekly_progress")
+}
+
+// ─── Profiles & Onboarding ───────────────────────────────────────────────────
+
+model UserProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique @map("user_id")
+  gender              String?   @db.VarChar(50)
+  dateOfBirth         DateTime? @map("date_of_birth") @db.Date
+  heightValue         Decimal?  @map("height_value") @db.Decimal(6, 2)
+  heightUnit          String    @default("cm") @map("height_unit") @db.VarChar(10)
+  weightValue         Decimal?  @map("weight_value") @db.Decimal(6, 2)
+  weightUnit          String    @default("kg") @map("weight_unit") @db.VarChar(10)
+  preferredWeightUnit String    @default("lb") @map("preferred_weight_unit") @db.VarChar(10)
+  appleHealthConnected Boolean   @default(false) @map("apple_health_connected")
+  lastHealthSyncAt    DateTime? @map("last_health_sync_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model OnboardingProfile {
+  id                String    @id @default(uuid())
+  userId            String?   @unique @map("user_id")
+  goal              String?   @db.VarChar(50)
+  consistency       String?   @db.VarChar(50)
+  experience        String?   @db.VarChar(50)
+  environment       String?   @db.VarChar(50)
+  workoutsPerWeek   Int?      @map("workouts_per_week")
+  specificDays      Json?     @map("specific_days")
+  bodyStatsSnapshot Json?     @map("body_stats_snapshot")
+  notificationOptIn Boolean   @default(false) @map("notification_opt_in")
+  notificationTime  String?   @map("notification_time") // Store as HH:mm
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  equipmentProfiles EquipmentProfile[]
+
+  @@map("onboarding_profiles")
+}
+
+model NotificationPreference {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  workoutPreviewEnabled Boolean   @default(false) @map("workout_preview_enabled")
+  workoutPreviewTime    String?   @map("workout_preview_time")
+  pushEnabled           Boolean   @default(false) @map("push_enabled")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// ─── Equipment & Environment ──────────────────────────────────────────────────
+
+model EquipmentProfile {
+  id                  String    @id @default(uuid())
+  userId              String?   @map("user_id")
+  onboardingProfileId String?   @map("onboarding_profile_id")
+  name                String    @db.VarChar(255)
+  environmentType     String?   @map("environment_type") @db.VarChar(50)
+  isDefault           Boolean   @default(false) @map("is_default")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  onboardingProfile OnboardingProfile? @relation(fields: [onboardingProfileId], references: [id])
+  items             EquipmentProfileItem[]
+
+  @@map("equipment_profiles")
+}
+
+model EquipmentProfileItem {
+  id                 String   @id @default(uuid())
+  equipmentProfileId String   @map("equipment_profile_id")
+  equipmentCode      String   @map("equipment_code") @db.VarChar(100)
+  label              String   @db.VarChar(255)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  equipmentProfile EquipmentProfile @relation(fields: [equipmentProfileId], references: [id], onDelete: Cascade)
+
+  @@map("equipment_profile_items")
 }

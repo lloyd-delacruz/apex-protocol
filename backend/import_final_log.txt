@@ -1,0 +1,48 @@
+
+> @apex/backend@1.0.0 exercises:import
+> ts-node-dev --transpile-only src/scripts/importExercises.ts --page-size 100 --delay-ms 2000
+
+[INFO] 01:33:36 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+
+────────────────────────────────────────────────
+  Apex Protocol — ExerciseDB Import
+────────────────────────────────────────────────
+  Mode:       full library
+  Page size:  100
+  Delay:      2000ms between pages
+
+  Fetching full library (page size: 100)...
+[INFO] 01:33:47 Restarting: /Users/lloyd.vince1985gmail.com/Desktop/Software Dev/Apex-Protocol/backend/src/services/WgerService.ts has been modified
+
+────────────────────────────────────────────────
+  Apex Protocol — ExerciseDB Import
+────────────────────────────────────────────────
+  Mode:       full library
+  Page size:  100
+  Delay:      2000ms between pages
+
+  Fetching full library (page size: 100)...
+Wger image lookup failed for "assisted hanging knee raise with throw down": timeout of 10000ms exceeded
+Wger image lookup failed for "assisted hanging knee raise": timeout of 10000ms exceeded
+Wger image lookup failed for "assisted lying leg raise with throw down": timeout of 10000ms exceeded
+prisma:error 
+Invalid `prisma.exercise.update()` invocation in
+/Users/lloyd.vince1985gmail.com/Desktop/Software Dev/Apex-Protocol/backend/src/services/ExerciseImportService.ts:213:27
+
+  210 });
+  211 
+  212 if (byExternalId) {
+→ 213   await prisma.exercise.update(
+Unique constraint failed on the fields: (`name`)
+  [ERROR] barbell seated calf raise: Duplicate name conflict
+
+  FATAL: Import failed before processing could begin.
+  ExerciseDB rate limit exceeded. Try again later.
+
+npm error Lifecycle script `exercises:import` failed with error:
+npm error code 1
+npm error path /Users/lloyd.vince1985gmail.com/Desktop/Software Dev/Apex-Protocol/backend
+npm error workspace @apex/backend@1.0.0
+npm error location /Users/lloyd.vince1985gmail.com/Desktop/Software Dev/Apex-Protocol/backend
+npm error command failed
+npm error command sh -c ts-node-dev --transpile-only src/scripts/importExercises.ts --page-size 100 --delay-ms 2000

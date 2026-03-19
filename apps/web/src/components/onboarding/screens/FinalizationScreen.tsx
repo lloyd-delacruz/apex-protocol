@@ -7,6 +7,9 @@ import { Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import api from '@/lib/api';
 
+// DEV BYPASS: Set to true to skip API calls and go straight to workout
+const DEV_BYPASS = true;
+
 export default function FinalizationScreen() {
   const { data, updateData, nextStep, completeOnboarding } = useOnboarding();
   const router = useRouter();
@@ -15,13 +18,44 @@ export default function FinalizationScreen() {
 
   useEffect(() => {
     const generateProfile = async () => {
+      // DEV BYPASS: Skip all API calls and redirect directly to workout
+      if (DEV_BYPASS) {
+        await new Promise(r => setTimeout(r, 800));
+        setStatus('success');
+        setTimeout(() => {
+          // Set all required flags so auth guard and onboarding check pass
+          if (!localStorage.getItem('apex_token')) {
+            localStorage.setItem('apex_token', 'dev_bypass_token');
+          }
+          localStorage.setItem('apex_subscription_active', 'true');
+          localStorage.setItem('apex_onboarding_complete', 'true');
+          completeOnboarding();
+          router.push('/workout');
+        }, 1000);
+        return;
+      }
+
       // Step 1: Analyzing user data (visual only)
       await new Promise(r => setTimeout(r, 1500));
       setStatus('generating');
 
       try {
+        // Step 1.5: Save onboarding profile to backend for long-term persistence
+        try {
+          await api.profiles.saveOnboarding({
+            goal: data.goal,
+            experience: data.experience,
+            workoutsPerWeek: data.workoutsPerWeek,
+            environment: data.environment,
+            equipment: data.equipment,
+            specificDays: data.specificDays,
+            bodyStatsSnapshot: data.bodyStats
+          });
+        } catch (profileErr) {
+          console.error('Failed to sync onboarding profile to backend', profileErr);
+        }
+
         // Step 2: Call API to generate initial program
-        // We map our onboarding goals/experience to what the API expects
         const res = await api.programs.generate({
           goals: data.goal ? [data.goal] : ['strength'],
           experienceLevel: data.experience || 'beginner',
@@ -32,6 +66,15 @@ export default function FinalizationScreen() {
         if (res?.program?.id) {
           // Success! Save program to state
           updateData({ generatedProgram: res });
+
+          // STEP 10: Assign the program to the user immediately
+          try {
+            await api.programs.assignGenerated(res.program.id);
+          } catch (assignErr) {
+            console.error('Program assignment failed, but program was generated', assignErr);
+            // We continue anyway since they can try assigning from dashboard
+          }
+
           setStatus('success');
           // Auto-advance after a brief "Success" pause
           setTimeout(() => {
@@ -48,7 +91,7 @@ export default function FinalizationScreen() {
     };
 
     generateProfile();
-  }, [data, nextStep, updateData]);
+  }, [data, nextStep, updateData, completeOnboarding, router]);
 
   const handleManualAdvance = () => {
     nextStep();

@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 
 export default function WelcomeScreen() {
-  const { nextStep } = useOnboarding();
+  const { nextStep, skipOnboarding } = useOnboarding();
   const router = useRouter();
 
   return (
@@ -44,7 +44,7 @@ export default function WelcomeScreen() {
           variant="ghost" 
           size="lg" 
           fullWidth 
-          onClick={() => router.push('/')}
+          onClick={skipOnboarding}
           className="h-14"
         >
           Log In

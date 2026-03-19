@@ -6,11 +6,11 @@ import Sidebar from '@/components/layout/Sidebar';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/programs': 'Programs',
-  '/workout': 'Workout',
-  '/progress': 'Progress',
-  '/metrics': 'Body Metrics',
-  '/settings': 'Settings',
+  '/dashboard/programs': 'Programs',
+  '/dashboard/workout': 'Workout',
+  '/dashboard/progress': 'Progress',
+  '/dashboard/metrics': 'Body Metrics',
+  '/dashboard/settings': 'Settings',
 };
 
 function getPageTitle(pathname: string): string {
@@ -102,7 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Quick start button */}
             <a
-              href="/workout"
+              href="/dashboard/workout"
               className="btn-primary text-sm px-4 py-1.5 rounded-card"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

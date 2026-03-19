@@ -42,8 +42,10 @@ export default function OnboardingFlow() {
     }
   };
 
-  const totalSteps = 15;
-  const progress = (step / totalSteps) * 100;
+  // Progress bar only covers the 11 data-collection screens (steps 2–12)
+  // Steps 12–15 are finalization/paywall and hide the header
+  const DATA_SCREENS = 11;
+  const progress = Math.min(((step - 1) / DATA_SCREENS) * 100, 100);
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto border-x border-white/[0.04] shadow-2xl relative overflow-hidden">
@@ -54,7 +56,7 @@ export default function OnboardingFlow() {
       {step > 1 && step < 12 && (
         <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md p-4 space-y-3">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Step {step} of {totalSteps}</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Step {step - 1} of {DATA_SCREENS}</span>
             <span className="text-[10px] font-bold text-accent uppercase tracking-widest">{Math.round(progress)}% Complete</span>
           </div>
           <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden">

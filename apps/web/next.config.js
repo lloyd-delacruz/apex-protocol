@@ -18,6 +18,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'exercisedb.p.rapidapi.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'wger.de',
+      },
     ],
   },
   async rewrites() {

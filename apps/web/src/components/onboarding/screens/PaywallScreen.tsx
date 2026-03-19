@@ -16,7 +16,7 @@ export default function PaywallScreen() {
     localStorage.setItem('apex_subscription_active', 'true');
     localStorage.setItem('apex_onboarding_complete', 'true');
     completeOnboarding();
-    router.push('/dashboard');
+    router.push('/workout');
   };
 
   const benefits = [

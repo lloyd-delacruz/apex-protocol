@@ -96,12 +96,12 @@ export default function WorkoutExerciseCard({
                        </span>
                     )}
                  </div>
-                 <h3 className="text-base font-black text-text-primary uppercase tracking-tight truncate leading-tight mb-1">
+                  <h3 className="text-lg font-bold text-text-primary tracking-tight truncate leading-tight mb-1 group-hover:text-accent transition-colors">
                     {exercise.name}
-                 </h3>
-                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                  </h3>
+                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
                     {exercise.setCount} Sets · {exercise.repMin}-{exercise.repMax} Reps
-                 </p>
+                  </p>
               </div>
            </div>
 

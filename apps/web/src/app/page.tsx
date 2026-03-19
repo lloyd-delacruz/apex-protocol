@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import api, { saveAuth } from '@/lib/api';
+
+// DEV BYPASS: Set to true to skip authentication during testing
+const DEV_BYPASS = true;
 
 export default function LandingPage() {
   const router = useRouter();
@@ -9,19 +13,66 @@ export default function LandingPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    // DEV BYPASS: skip auth, go straight to dashboard
-    localStorage.setItem('apex_token', 'dev-bypass-token');
+  // On mount: if already authenticated, route to the correct screen
+  useEffect(() => {
+    // DEV BYPASS: skip auth and go directly to onboarding
+    if (DEV_BYPASS) {
+      const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
+      if (!localStorage.getItem('apex_token')) {
+        saveAuth('dev_bypass_token', { id: 'dev', email: 'dev@test.com', name: 'Dev User' });
+      }
+      if (onboardingComplete === 'true') {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/onboarding');
+      }
+      return;
+    }
 
+    const token = localStorage.getItem('apex_token');
+    if (!token) return;
     const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
-    if (!onboardingComplete) {
-      router.push('/onboarding');
+    if (onboardingComplete === 'true') {
+      router.replace('/dashboard');
     } else {
-      router.push('/dashboard');
+      router.replace('/onboarding');
+    }
+  }, [router]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      let result;
+      if (mode === 'login') {
+        result = await api.auth.login(email, password);
+      } else {
+        if (!name.trim()) {
+          setError('Please enter your full name.');
+          setLoading(false);
+          return;
+        }
+        result = await api.auth.register(email, password, name.trim());
+      }
+
+      saveAuth(result.token, result.user, result.refreshToken);
+
+      const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
+      if (onboardingComplete === 'true') {
+        router.push('/dashboard');
+      } else {
+        router.push('/onboarding');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   }
 

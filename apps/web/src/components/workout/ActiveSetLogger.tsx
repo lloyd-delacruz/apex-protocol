@@ -109,10 +109,10 @@ export default function ActiveSetLogger({
         <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
 
         {/* Header */}
-        <div className="p-6 pb-4 flex items-start justify-between">
+        <div className="p-8 pb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-xl font-bold text-text-primary tracking-tight">{exercise.name}</h3>
-            <p className="text-xs font-medium text-text-muted mt-0.5 uppercase tracking-wider">
+            <h3 className="text-2xl font-bold text-text-primary tracking-tight">{exercise.name}</h3>
+            <p className="text-xs font-semibold text-text-muted mt-1 uppercase tracking-widest">
               {exercise.primaryMuscle || exercise.muscleGroup} · {activeTab === 'working' ? 'Working' : 'Warm-up'} Sets
             </p>
           </div>

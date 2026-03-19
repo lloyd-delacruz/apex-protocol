@@ -119,7 +119,7 @@ export default function DashboardPage() {
       <div className="space-y-4">
          <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-text-muted uppercase tracking-[0.2em]">Efficiency Protocol</h3>
-            <Link href="/progress" className="text-[10px] font-black text-accent uppercase tracking-widest hover:underline">Full Analytics</Link>
+            <Link href="/dashboard/progress" className="text-[10px] font-black text-accent uppercase tracking-widest hover:underline">Full Analytics</Link>
          </div>
          <WeeklyProgressStats
            totalVolume={latestVolume}
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                   </p>
                </div>
                {dayName && (
-                  <Link href="/workout">
+                  <Link href="/dashboard/workout">
                      <Button variant="primary" className="h-16 px-10 rounded-[28px] font-black uppercase tracking-widest shadow-accent italic group/btn text-sm">
                         Ignite <ArrowRight size={20} className="ml-2 group-hover/btn:translate-x-1 transition-transform" />
                      </Button>
@@ -155,7 +155,23 @@ export default function DashboardPage() {
                )}
             </div>
 
-            {todayExercises.length > 0 ? (
+            {todayWorkout === null ? (
+               /* No program assigned at all */
+               <div className="py-16 text-center relative z-10">
+                  <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
+                     <ArrowRight size={32} className="text-accent" />
+                  </div>
+                  <p className="text-base font-bold text-text-primary uppercase tracking-widest italic mb-2">
+                     No Program Assigned
+                  </p>
+                  <p className="text-xs text-text-muted mb-6">Complete onboarding to generate your personalized program.</p>
+                  <Link href="/onboarding">
+                     <Button variant="primary" size="sm" className="rounded-2xl font-black uppercase tracking-widest">
+                        Generate Program
+                     </Button>
+                  </Link>
+               </div>
+            ) : todayExercises.length > 0 ? (
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
                   {todayExercises.slice(0, 4).map((ep, idx) => (
                      <div key={ep.id} className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/[0.04] rounded-2xl hover:bg-white/[0.04] transition-colors">
@@ -175,6 +191,7 @@ export default function DashboardPage() {
                   )}
                </div>
             ) : (
+               /* Program assigned but today is a rest day */
                <div className="py-20 text-center relative z-10">
                   <div className="w-20 h-20 rounded-full bg-white/[0.04] flex items-center justify-center mx-auto mb-6 text-text-muted">
                      <Clock size={40} />

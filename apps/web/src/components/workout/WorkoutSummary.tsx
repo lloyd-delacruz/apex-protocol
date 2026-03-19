@@ -29,8 +29,8 @@ export default function WorkoutSummary({ stats, onClose }: WorkoutSummaryProps) 
          </div>
       </div>
 
-      <h1 className="text-6xl font-black text-white uppercase italic tracking-tighter mb-4 leading-none">
-         Legacy <span className="text-accent underline decoration-white/10 underline-offset-8">Cemented</span>
+      <h1 className="text-5xl font-black text-white italic tracking-tighter mb-4 leading-none">
+         Legacy <span className="text-accent underline decoration-white/5 underline-offset-8">Achieved</span>
       </h1>
       <p className="text-text-muted font-black uppercase tracking-[0.3em] mb-12 flex items-center justify-center gap-2">
          <Zap size={14} className="text-accent" /> Session archived. Streak extended. <Zap size={14} className="text-accent" />

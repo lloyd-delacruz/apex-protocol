@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Play, 
   Settings, 
@@ -40,16 +41,20 @@ interface LoggedSet {
 }
 
 export default function WorkoutPage() {
+  const router = useRouter();
   const [workoutState, setWorkoutState] = useState<WorkoutState>('idle');
   const [todayWorkout, setTodayWorkout] = useState<ApiTodayWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Session State
   const [exercises, setExercises] = useState<any[]>([]);
   const [loggedSets, setLoggedSets] = useState<Record<string, LoggedSet[]>>({});
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  // Maps prescriptionId (or custom-* key) → workout_session_exercise.id
+  const [sessionExerciseIds, setSessionExerciseIds] = useState<Record<string, string>>({});
+
   // UI State
   const [activeExerciseIdx, setActiveExerciseIdx] = useState<number | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -57,6 +62,8 @@ export default function WorkoutPage() {
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [selectedOptionsIdx, setSelectedOptionsIdx] = useState<number | null>(null);
+  // When non-null, library is in replace mode for this exercise index
+  const [replaceIdx, setReplaceIdx] = useState<number | null>(null);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [pendingProgressions, setPendingProgressions] = useState<ApiPendingProgression[]>([]);
   const [restDuration, setRestDuration] = useState(90);
@@ -106,9 +113,24 @@ export default function WorkoutPage() {
   }, [workoutState, startTime]);
 
   // Actions
-  const startWorkout = () => {
+  const startWorkout = async () => {
     setWorkoutState('active');
     setStartTime(new Date());
+
+    try {
+      const result = await api.workouts.startSession(todayWorkout?.workoutDay?.id);
+      if (result?.session?.id) {
+        setSessionId(result.session.id);
+        // Build prescriptionId → sessionExerciseId map for set logging
+        const idMap: Record<string, string> = {};
+        (result.sessionExercises ?? []).forEach((se: any) => {
+          if (se.workoutExerciseId) idMap[se.workoutExerciseId] = se.id;
+        });
+        setSessionExerciseIds(idMap);
+      }
+    } catch (err) {
+      console.error('Failed to start session on backend', err);
+    }
   };
 
   const handleFinishWorkout = async () => {
@@ -143,6 +165,16 @@ export default function WorkoutPage() {
       });
 
     await Promise.all(logPromises);
+    
+    // STEP 15: Finish session on backend
+    if (sessionId) {
+      try {
+        await api.workouts.finishSession(sessionId);
+      } catch (err) {
+        console.error('Failed to finish session on backend', err);
+      }
+    }
+    
     setWorkoutState('completed');
   };
 
@@ -160,20 +192,68 @@ export default function WorkoutPage() {
     setExercises(newExs);
   };
 
-  const addExercises = (newExs: ApiExercise[]) => {
-    const mapped = newExs.map(ex => ({
-      prescriptionId: `custom-${Math.random()}`,
-      exerciseId: ex.id,
-      name: ex.name,
-      muscleGroup: ex.muscleGroup || '',
-      primaryMuscle: ex.primaryMuscle,
-      setCount: 3,
-      repMin: 8,
-      repMax: 12,
-      mediaUrl: ex.mediaUrl,
-      equipment: ex.equipment
-    }));
-    setExercises([...exercises, ...mapped]);
+  const handleLibrarySelect = async (newExs: ApiExercise[]) => {
+    if (replaceIdx !== null) {
+      // Replace mode: swap the exercise at replaceIdx
+      const oldEx = exercises[replaceIdx];
+      const newEx = newExs[0];
+      const updated = [...exercises];
+      updated[replaceIdx] = {
+        ...oldEx,
+        exerciseId: newEx.id,
+        name: newEx.name,
+        muscleGroup: newEx.muscleGroup || '',
+        primaryMuscle: newEx.primaryMuscle,
+        mediaUrl: newEx.mediaUrl,
+        equipment: newEx.equipment,
+      };
+      setExercises(updated);
+
+      // Persist replacement to backend
+      const sessionExerciseId = sessionExerciseIds[oldEx.prescriptionId];
+      if (sessionExerciseId) {
+        try {
+          await api.workouts.updateSessionExercise(sessionExerciseId, newEx.id);
+        } catch (err) {
+          console.error('Failed to update session exercise', err);
+        }
+      }
+      setReplaceIdx(null);
+    } else {
+      // Add mode: append new exercises
+      const mapped = newExs.map(ex => ({
+        prescriptionId: `custom-${ex.id}-${Date.now()}`,
+        exerciseId: ex.id,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup || '',
+        primaryMuscle: ex.primaryMuscle,
+        setCount: 3,
+        repMin: 8,
+        repMax: 12,
+        mediaUrl: ex.mediaUrl,
+        equipment: ex.equipment,
+      }));
+      setExercises(prev => [...prev, ...mapped]);
+
+      // Register custom exercises in the session
+      if (sessionId) {
+        for (let i = 0; i < mapped.length; i++) {
+          const ex = mapped[i];
+          try {
+            const se = await api.workouts.addSessionExercise(
+              sessionId,
+              ex.exerciseId,
+              exercises.length + i
+            );
+            if (se?.id) {
+              setSessionExerciseIds(prev => ({ ...prev, [ex.prescriptionId]: se.id }));
+            }
+          } catch (err) {
+            console.error('Failed to add session exercise', err);
+          }
+        }
+      }
+    }
     setShowLibrary(false);
   };
 
@@ -198,61 +278,99 @@ export default function WorkoutPage() {
     </div>
   );
 
-  // ── Idle State ─────────────────────────────────────────────────────────────
+  // ── Idle State (Hero View) ──────────────────────────────────────────────────
   if (workoutState === 'idle') {
+    const monthNumber = Math.ceil((todayWorkout?.currentWeek?.absoluteWeekNumber || 1) / 4);
+    const weekNumber = todayWorkout?.currentWeek?.weekNumber || 1;
+    const dayNumber = todayWorkout?.workoutDay?.sortOrder || 1;
+    const phaseNames = ['Foundation', 'Development', 'Intensification'];
+    const phaseName = phaseNames[monthNumber - 1] || 'Active Phase';
+
     return (
-      <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-        <div>
-          <h1 className="text-4xl font-black text-text-primary uppercase italic tracking-tighter leading-none mb-2 underline decoration-accent/30 decoration-8 underline-offset-4">
-            Today&apos;s Protocol
+      <div className="max-w-xl mx-auto pt-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="text-center mb-12">
+          {/* Program Context Chip */}
+          <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1.5 mb-8 shadow-xl">
+             <div className="px-4 py-1.5 rounded-xl bg-accent text-white text-[10px] font-black uppercase tracking-widest shadow-accent-sm">
+               Phase {monthNumber}: {phaseName}
+             </div>
+             <div className="px-4 py-1.5 text-text-muted text-[10px] font-bold uppercase tracking-widest">
+               Week {weekNumber} · Day {dayNumber}
+             </div>
+          </div>
+
+          <div className="relative mb-8 flex justify-center group">
+             <div className="w-24 h-24 rounded-[32px] bg-gradient-to-br from-accent to-[#7B61FF] rotate-12 flex items-center justify-center shadow-accent-elevated group-hover:rotate-0 transition-transform duration-500">
+                <Activity size={40} className="text-white -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+             </div>
+             <div className="absolute -top-2 right-[38%] w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center border border-white/10 shadow-lg animate-bounce">
+                <span className="text-xs">💪</span>
+             </div>
+          </div>
+
+          <h1 className="text-5xl font-bold text-text-primary tracking-tight leading-[0.9] mb-4">
+            Today&apos;s <span className="text-gradient-accent">Protocol</span>
           </h1>
-          <p className="text-sm font-bold text-text-muted uppercase tracking-widest flex items-center gap-2">
-            <Clock size={14} className="text-accent" /> {todayWorkout?.workoutDay?.workoutType || 'Custom Session'} · {exercises.length} Exercises
+          <p className="text-text-muted text-lg max-w-sm mx-auto font-medium">
+            {todayWorkout?.workoutDay?.workoutType || 'Custom Strength Session'}
+            <br />
+            <span className="text-text-muted/60 text-sm italic">{exercises.length} Exercises · Approx. 45-60 min</span>
           </p>
         </div>
 
         {pendingProgressions.length > 0 && (
-          <ProgressionPromptBanner 
-            progressions={pendingProgressions}
-            onUpdate={setPendingProgressions}
-          />
+          <div className="mb-10">
+            <ProgressionPromptBanner 
+              progressions={pendingProgressions}
+              onUpdate={setPendingProgressions}
+            />
+          </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4">
-          {exercises.map((ex, i) => (
-             <div key={ex.prescriptionId} className="group relative">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-accent/20 to-accent-secondary/20 rounded-[32px] blur opacity-0 group-hover:opacity-100 transition duration-500" />
-                <Card className="relative p-5 bg-surface border border-white/[0.06] rounded-[30px] flex items-center gap-5">
-                   <div className="w-16 h-16 rounded-2xl bg-background overflow-hidden border border-white/[0.04] shrink-0">
-                      {ex.mediaUrl ? (
-                         <img src={ex.mediaUrl} alt={ex.name} className="w-full h-full object-cover" />
-                      ) : (
-                         <div className="w-full h-full flex items-center justify-center text-text-muted">
-                            <Activity size={24} />
-                         </div>
-                      )}
-                   </div>
-                   <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black text-accent uppercase tracking-[0.15em] mb-0.5">{ex.primaryMuscle || ex.muscleGroup}</p>
-                      <h3 className="text-base font-black text-text-primary uppercase tracking-tight truncate">{ex.name}</h3>
-                      <p className="text-xs font-bold text-text-muted uppercase tracking-widest mt-1">{ex.setCount} Sets · {ex.repMin}-{ex.repMax} Reps</p>
-                   </div>
-                   <ChevronRight size={20} className="text-text-muted group-hover:text-accent transition-colors" />
-                </Card>
-             </div>
-          ))}
-        </div>
-
-        <div className="sticky bottom-8 z-20 px-4">
-           <Button 
+        {/* Start Button Hero */}
+        <div className="mb-12">
+          <Button 
             variant="primary" 
             fullWidth 
-            size="lg"
-            className="h-20 rounded-[32px] text-lg font-black uppercase italic tracking-widest shadow-accent flex gap-3 group"
+            className="h-20 rounded-[32px] text-xl font-bold tracking-tight shadow-accent-elevated flex gap-4 group overflow-hidden relative"
             onClick={startWorkout}
-           >
-             Ignite Protocol <Play size={24} fill="currentColor" className="group-hover:translate-x-1 transition-transform" />
-           </Button>
+          >
+            <div className="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
+            <span className="relative z-10 font-black uppercase tracking-tighter">Ignite Session</span>
+            <Play size={24} fill="currentColor" className="relative z-10 group-hover:scale-125 transition-transform duration-300" />
+          </Button>
+        </div>
+
+        {/* Protocol Preview */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-2 mb-4">
+             <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Protocol Preview</h3>
+             <div className="h-px flex-1 bg-white/[0.06] ml-4" />
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3">
+            {exercises.map((ex, i) => (
+              <div 
+                key={ex.prescriptionId} 
+                className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/[0.04] group hover:border-accent/30 hover:bg-white/[0.04] transition-all duration-300"
+              >
+                <div className="w-12 h-12 rounded-xl bg-background border border-white/[0.04] overflow-hidden shrink-0 flex items-center justify-center">
+                  {ex.mediaUrl ? (
+                    <img src={ex.mediaUrl} alt={ex.name} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-text-muted/40">
+                      <Activity size={20} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-text-primary group-hover:text-accent transition-colors truncate">{ex.name}</h4>
+                  <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest mt-0.5">{ex.setCount} Sets · {ex.repMin}-{ex.repMax} Reps</p>
+                </div>
+                <ChevronRight size={16} className="text-text-muted/30 group-hover:text-accent transition-colors" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -335,10 +453,10 @@ export default function WorkoutPage() {
         </div>
 
         {/* Floating Modals */}
-        <ExerciseLibrary 
+        <ExerciseLibrary
           isOpen={showLibrary}
-          onClose={() => setShowLibrary(false)}
-          onSelect={addExercises}
+          onClose={() => { setShowLibrary(false); setReplaceIdx(null); }}
+          onSelect={handleLibrarySelect}
         />
 
         <ExerciseOptionsBottomSheet 
@@ -346,6 +464,7 @@ export default function WorkoutPage() {
           onClose={() => setShowOptions(false)}
           exerciseName={selectedOptionsIdx !== null ? exercises[selectedOptionsIdx].name : ''}
           onReplace={() => {
+             setReplaceIdx(selectedOptionsIdx);
              setShowOptions(false);
              setShowLibrary(true);
           }}
@@ -370,30 +489,69 @@ export default function WorkoutPage() {
 
         {activeExerciseIdx !== null && (
           <>
-            <ActiveSetLogger 
+            <ActiveSetLogger
               isOpen={showLogger}
               onClose={() => setShowLogger(false)}
               exercise={exercises[activeExerciseIdx]}
-              onLogSet={(set) => {
-                 setLoggedSets(prev => ({
-                   ...prev,
-                   [exercises[activeExerciseIdx].prescriptionId]: [
-                     ...(prev[exercises[activeExerciseIdx].prescriptionId] || []),
-                     { ...set, id: Math.random().toString() } as any
-                   ]
-                 }));
-                 if (set.completed) {
-                   setShowLogger(false);
-                   setShowRestTimer(true);
-                 }
+              onLogSet={async (set) => {
+                const ex = exercises[activeExerciseIdx];
+                const localId = Math.random().toString();
+                setLoggedSets(prev => ({
+                  ...prev,
+                  [ex.prescriptionId]: [
+                    ...(prev[ex.prescriptionId] || []),
+                    { ...set, id: localId } as any,
+                  ],
+                }));
+                if (set.completed) {
+                  setShowLogger(false);
+                  setShowRestTimer(true);
+                }
+                // Persist to backend
+                const sessionExerciseId = sessionExerciseIds[ex.prescriptionId];
+                if (sessionExerciseId) {
+                  const existingSets = loggedSets[ex.prescriptionId] ?? [];
+                  try {
+                    await api.workouts.logSet(sessionExerciseId, {
+                      setType: set.type === 'warmup' ? 'warmup' : 'working',
+                      setOrder: existingSets.length,
+                      actualReps: set.actualReps ?? undefined,
+                      actualWeight: set.actualWeight ?? undefined,
+                      unit: 'kg',
+                      completed: set.completed ?? true,
+                    });
+                  } catch (err) {
+                    console.error('Failed to log set', err);
+                  }
+                }
               }}
-              onLogAll={(sets) => {
-                 setLoggedSets(prev => ({
-                   ...prev,
-                   [exercises[activeExerciseIdx].prescriptionId]: sets.map(s => ({ ...s, id: Math.random().toString() } as any))
-                 }));
-                 setShowLogger(false);
-                 setShowRestTimer(true);
+              onLogAll={async (sets) => {
+                const ex = exercises[activeExerciseIdx];
+                setLoggedSets(prev => ({
+                  ...prev,
+                  [ex.prescriptionId]: sets.map(s => ({ ...s, id: Math.random().toString() } as any)),
+                }));
+                setShowLogger(false);
+                setShowRestTimer(true);
+                // Persist all sets to backend
+                const sessionExerciseId = sessionExerciseIds[ex.prescriptionId];
+                if (sessionExerciseId) {
+                  for (let i = 0; i < sets.length; i++) {
+                    const s = sets[i];
+                    try {
+                      await api.workouts.logSet(sessionExerciseId, {
+                        setType: s.type === 'warmup' ? 'warmup' : 'working',
+                        setOrder: i,
+                        actualReps: s.actualReps ?? undefined,
+                        actualWeight: s.actualWeight ?? undefined,
+                        unit: 'kg',
+                        completed: true,
+                      });
+                    } catch (err) {
+                      console.error('Failed to log set', err);
+                    }
+                  }
+                }
               }}
               initialSets={loggedSets[exercises[activeExerciseIdx].prescriptionId] as any[]}
             />
@@ -425,8 +583,8 @@ export default function WorkoutPage() {
   // ── Completed State ─────────────────────────────────────────────────────────────
   if (workoutState === 'completed') {
     return (
-      <WorkoutSummary 
-        onClose={() => window.location.href = '/dashboard'}
+      <WorkoutSummary
+        onClose={() => router.push('/dashboard')}
         stats={{
           duration: formatTime(elapsedSeconds),
           exercises: exercises.length,

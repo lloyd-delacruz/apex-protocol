@@ -25,6 +25,7 @@
 import prisma from '../db/prisma';
 import { ExerciseDbService, ExerciseDbExercise } from './ExerciseDbService';
 import { ExerciseClassificationService } from './ExerciseClassificationService';
+import { WgerService } from './WgerService';
 
 // ─── Result types ─────────────────────────────────────────────────────────────
 
@@ -146,9 +147,9 @@ interface NormalisedExercise {
 /**
  * Map a raw ExerciseDB record to the Apex Protocol Exercise schema.
  * Classification is delegated to ExerciseClassificationService.
- * Pure function — no I/O.
+ * Fallback media is fetched from Wger if missing.
  */
-function normaliseExercise(raw: ExerciseDbExercise): NormalisedExercise {
+async function normaliseExercise(raw: ExerciseDbExercise): Promise<NormalisedExercise> {
   const bodyPart      = BODY_PART_MAP[raw.bodyPart.toLowerCase()] ?? raw.bodyPart;
   const equipment     = EQUIPMENT_MAP[raw.equipment.toLowerCase()] ?? raw.equipment;
   const primaryMuscle = toTitleCase(raw.target);
@@ -179,7 +180,7 @@ function normaliseExercise(raw: ExerciseDbExercise): NormalisedExercise {
     difficulty:       classification.difficulty,
     isCompound:       classification.isCompound,
     isUnilateral:     classification.isUnilateral,
-    mediaUrl:         raw.gifUrl || null,
+    mediaUrl:         raw.gifUrl || await WgerService.getImageUrl(raw.name),
     instructions,
     // Legacy fields — mirror the derived values so existing filters still work
     category:    classification.exerciseType,
@@ -201,7 +202,7 @@ function normaliseExercise(raw: ExerciseDbExercise): NormalisedExercise {
  *   3. No match                             → create new record.
  */
 async function upsertExercise(raw: ExerciseDbExercise): Promise<ExerciseOutcome> {
-  const data = normaliseExercise(raw);
+  const data = await normaliseExercise(raw);
 
   // ── Strategy 1: previously imported from ExerciseDB ──────────────────────
   const byExternalId = await prisma.exercise.findFirst({
@@ -223,7 +224,8 @@ async function upsertExercise(raw: ExerciseDbExercise): Promise<ExerciseOutcome>
         difficulty:       data.difficulty,
         isCompound:       data.isCompound,
         isUnilateral:     data.isUnilateral,
-        mediaUrl:         data.mediaUrl,
+        // Only update mediaUrl if we have a new one, or if it was previously empty
+        mediaUrl:         data.mediaUrl || byExternalId.mediaUrl,
         instructions:     data.instructions,
         category:         data.category,
         muscleGroup:      data.muscleGroup,
@@ -321,20 +323,34 @@ async function processBatch(
   result: ImportResult,
   onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
-  for (let i = 0; i < exercises.length; i++) {
-    const raw = exercises[i];
-    try {
-      const outcome = await upsertExercise(raw);
-      result[outcome]++;
-    } catch (err) {
-      result.failed++;
-      result.errors.push({
-        externalId: raw.id,
-        name:       raw.name,
-        error:      err instanceof Error ? err.message : String(err),
-      });
-    }
-    onProgress?.(i + 1, exercises.length);
+  const CHUNK_SIZE = 5; // Conservative chunk size for rate-limit safety
+  
+  for (let i = 0; i < exercises.length; i += CHUNK_SIZE) {
+    const chunk = exercises.slice(i, i + CHUNK_SIZE);
+    
+    await Promise.all(chunk.map(async (raw) => {
+      try {
+        const outcome = await upsertExercise(raw);
+        result[outcome]++;
+        if (outcome === 'imported') {
+          console.log(`  [NEW] ${raw.name}`);
+        }
+      } catch (err: any) {
+        result.failed++;
+        const errorMessage = err.code === 'P2002' 
+          ? 'Duplicate name conflict' 
+          : err.message;
+        
+        console.error(`  [ERROR] ${raw.name}: ${errorMessage}`);
+        result.errors.push({
+          externalId: raw.id,
+          name:       raw.name,
+          error:      errorMessage,
+        });
+      }
+    }));
+
+    onProgress?.(Math.min(i + CHUNK_SIZE, exercises.length), exercises.length);
   }
 }
 
@@ -375,7 +391,7 @@ export const ExerciseImportService = {
 
       offset  += exercises.length;
       page    += 1;
-      hasMore  = exercises.length === pageSize;
+      hasMore  = exercises.length > 0;
 
       // Respect rate limits between pages
       if (hasMore && delayMs > 0) {

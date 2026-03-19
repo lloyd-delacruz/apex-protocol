@@ -15,7 +15,7 @@ const navItems = [
     ),
   },
   {
-    href: '/programs',
+    href: '/dashboard/programs',
     label: 'Programs',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -24,7 +24,7 @@ const navItems = [
     ),
   },
   {
-    href: '/workout',
+    href: '/dashboard/workout',
     label: 'Workout',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +33,7 @@ const navItems = [
     ),
   },
   {
-    href: '/progress',
+    href: '/dashboard/progress',
     label: 'Progress',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,7 +42,7 @@ const navItems = [
     ),
   },
   {
-    href: '/metrics',
+    href: '/dashboard/metrics',
     label: 'Metrics',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ const navItems = [
     ),
   },
   {
-    href: '/settings',
+    href: '/dashboard/settings',
     label: 'Settings',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

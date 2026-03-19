@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OnboardingProfile, INITIAL_ONBOARDING_DATA } from './types';
+import api from '@/lib/api';
 
 interface OnboardingContextType {
   data: OnboardingProfile;
@@ -12,6 +13,7 @@ interface OnboardingContextType {
   setStep: (step: number) => void;
   isComplete: boolean;
   completeOnboarding: () => void;
+  skipOnboarding: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -47,7 +49,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, [data, step, isInitialized]);
 
   const updateData = (updates: Partial<OnboardingProfile>) => {
-    setData((prev) => ({ ...prev, ...updates }));
+    setData((prev) => {
+      const next = { ...prev, ...updates };
+      // Background sync to backend
+      api.profiles.saveOnboarding({
+        goal: next.goal,
+        experience: next.experience,
+        workoutsPerWeek: next.workoutsPerWeek,
+        environment: next.environment,
+        equipment: next.equipment,
+        bodyStatsSnapshot: next.bodyStats
+      }).catch(err => console.error('Onboarding sync failed:', err));
+      return next;
+    });
   };
 
   const nextStep = () => setStepState((prev) => prev + 1);
@@ -56,7 +70,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = () => {
     setIsComplete(true);
+    localStorage.setItem('apex_onboarding_complete', 'true');
     localStorage.removeItem(STORAGE_KEY);
+  };
+
+  const skipOnboarding = () => {
+    // For DEV mode or quick bypass
+    localStorage.setItem('apex_onboarding_complete', 'true');
+    if (!localStorage.getItem('apex_token')) {
+      localStorage.setItem('apex_token', 'dev_bypass_token');
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    window.location.href = '/dashboard';
   };
 
   return (
@@ -70,6 +95,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         setStep,
         isComplete,
         completeOnboarding,
+        skipOnboarding,
       }}
     >
       {children}
