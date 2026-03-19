@@ -1,6 +1,3 @@
-// Apex Protocol — Prisma Schema
-// Based on DATABASE_SCHEMA.md
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,56 +7,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Roles ────────────────────────────────────────────────────────────────────
-
 model Role {
   id        String   @id @default(uuid())
   name      String   @unique @db.VarChar(50)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  users User[]
+  users     User[]
 
   @@map("roles")
 }
 
-// ─── Users ────────────────────────────────────────────────────────────────────
-
 model User {
-  id           String    @id @default(uuid())
-  roleId       String    @map("role_id")
-  email        String    @unique @db.VarChar(255)
-  passwordHash String    @map("password_hash")
-  firstName    String?   @map("first_name") @db.VarChar(100)
-  lastName     String?   @map("last_name") @db.VarChar(100)
-  gender       String?   @db.VarChar(20)
-  dateOfBirth  DateTime? @map("date_of_birth") @db.Date
-  height       Decimal?  @db.Decimal(5, 2) // in cm
-  isActive     Boolean   @default(true) @map("is_active")
-  deletedAt    DateTime? @map("deleted_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  role                   Role                    @relation(fields: [roleId], references: [id])
-  refreshTokens          RefreshToken[]
+  id                     String                  @id @default(uuid())
+  roleId                 String                  @map("role_id")
+  email                  String                  @unique @db.VarChar(255)
+  passwordHash           String                  @map("password_hash")
+  firstName              String?                 @map("first_name") @db.VarChar(100)
+  lastName               String?                 @map("last_name") @db.VarChar(100)
+  isActive               Boolean                 @default(true) @map("is_active")
+  deletedAt              DateTime?               @map("deleted_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  dateOfBirth            DateTime?               @map("date_of_birth") @db.Date
+  gender                 String?                 @db.VarChar(20)
+  height                 Decimal?                @db.Decimal(5, 2)
   bodyMetrics            BodyMetric[]
-  trainingLogs           TrainingLog[]
-  userProgramAssignments UserProgramAssignment[]
-  createdPrograms        Program[]               @relation("CreatedPrograms")
-  exerciseWeights        UserExerciseWeight[]
-  workoutSessions        WorkoutSession[]
-  exercisePreferences    ExercisePreference[]
-  weeklyProgress         WeeklyProgress[]
-  userProfile            UserProfile?
-  onboardingProfile      OnboardingProfile?
-  notificationPreference NotificationPreference?
   equipmentProfiles      EquipmentProfile[]
+  exercisePreferences    ExercisePreference[]
+  notificationPreference NotificationPreference?
+  onboardingProfile      OnboardingProfile?
+  createdPrograms        Program[]               @relation("CreatedPrograms")
+  refreshTokens          RefreshToken[]
+  trainingLogs           TrainingLog[]
+  exerciseWeights        UserExerciseWeight[]
+  userProfile            UserProfile?
+  userProgramAssignments UserProgramAssignment[]
+  role                   Role                    @relation(fields: [roleId], references: [id])
+  weeklyProgress         WeeklyProgress[]
+  workoutSessions        WorkoutSession[]
 
   @@index([roleId])
   @@map("users")
 }
-
-// ─── Refresh Tokens ───────────────────────────────────────────────────────────
 
 model RefreshToken {
   id        String    @id @default(uuid())
@@ -68,56 +57,46 @@ model RefreshToken {
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
-// ─── Programs ─────────────────────────────────────────────────────────────────
-
 model Program {
-  id          String    @id @default(uuid())
-  name        String    @db.VarChar(255)
-  slug        String    @unique @db.VarChar(255)
-  description String?
-  // Core metadata
-  totalWeeks  Int       @map("total_weeks")
-  isActive    Boolean   @default(true) @map("is_active")
-  deletedAt   DateTime? @map("deleted_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  // Generation specific metadata
-  isCustom        Boolean   @default(false) @map("is_custom") // True if generated or custom-built, False if global template
-  authorId        String?   @map("author_id") // Who created this program
-  goalType        String?   @map("goal_type") @db.VarChar(50) // e.g. 'strength', 'hypertrophy'
-  experienceLevel String?   @map("experience_level") @db.VarChar(50) // e.g. 'beginner', 'intermediate'
-  daysPerWeek     Int?      @map("days_per_week")
-  equipmentList   String[]  @map("equipment_list") // e.g. ['barbell', 'dumbbell']
-  sourceType      String    @default("system") @map("source_type") @db.VarChar(50) // 'system', 'ai_generator', 'coach'
-
+  id                     String                  @id @default(uuid())
+  name                   String                  @db.VarChar(255)
+  slug                   String                  @unique @db.VarChar(255)
+  description            String?
+  totalWeeks             Int                     @map("total_weeks")
+  isActive               Boolean                 @default(true) @map("is_active")
+  deletedAt              DateTime?               @map("deleted_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  isCustom               Boolean                 @default(false) @map("is_custom")
+  authorId               String?                 @map("author_id")
+  goalType               String?                 @map("goal_type") @db.VarChar(50)
+  experienceLevel        String?                 @map("experience_level") @db.VarChar(50)
+  daysPerWeek            Int?                    @map("days_per_week")
+  equipmentList          String[]                @map("equipment_list")
+  sourceType             String                  @default("system") @map("source_type") @db.VarChar(50)
   programMonths          ProgramMonth[]
-  userProgramAssignments UserProgramAssignment[]
-  trainingLogs           TrainingLog[]
   author                 User?                   @relation("CreatedPrograms", fields: [authorId], references: [id])
+  trainingLogs           TrainingLog[]
+  userProgramAssignments UserProgramAssignment[]
 
   @@map("programs")
 }
 
-// ─── Program Months ───────────────────────────────────────────────────────────
-
 model ProgramMonth {
-  id          String   @id @default(uuid())
-  programId   String   @map("program_id")
-  monthNumber Int      @map("month_number")
-  name        String   @db.VarChar(255)
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  id           String        @id @default(uuid())
+  programId    String        @map("program_id")
+  monthNumber  Int           @map("month_number")
+  name         String        @db.VarChar(255)
+  description  String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
   program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
   programWeeks ProgramWeek[]
 
@@ -125,40 +104,34 @@ model ProgramMonth {
   @@map("program_months")
 }
 
-// ─── Program Weeks ────────────────────────────────────────────────────────────
-
 model ProgramWeek {
-  id                 String   @id @default(uuid())
-  programMonthId     String   @map("program_month_id")
-  weekNumber         Int      @map("week_number")
-  absoluteWeekNumber Int      @map("absolute_week_number")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  programMonth ProgramMonth @relation(fields: [programMonthId], references: [id], onDelete: Cascade)
-  workoutDays  WorkoutDay[]
-  trainingLogs TrainingLog[]
+  id                 String        @id @default(uuid())
+  programMonthId     String        @map("program_month_id")
+  weekNumber         Int           @map("week_number")
+  absoluteWeekNumber Int           @map("absolute_week_number")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  programMonth       ProgramMonth  @relation(fields: [programMonthId], references: [id], onDelete: Cascade)
+  trainingLogs       TrainingLog[]
+  workoutDays        WorkoutDay[]
 
   @@unique([programMonthId, weekNumber])
   @@map("program_weeks")
 }
 
-// ─── Workout Days ─────────────────────────────────────────────────────────────
-
 model WorkoutDay {
-  id            String   @id @default(uuid())
-  programWeekId String   @map("program_week_id")
-  dayCode       String   @map("day_code") @db.VarChar(20)
-  phase         String   @db.VarChar(50)
-  workoutType   String   @map("workout_type") @db.VarChar(100)
-  sortOrder     Int      @map("sort_order")
-  notes         String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  programWeek           ProgramWeek            @relation(fields: [programWeekId], references: [id], onDelete: Cascade)
+  id                    String                 @id @default(uuid())
+  programWeekId         String                 @map("program_week_id")
+  dayCode               String                 @map("day_code") @db.VarChar(20)
+  phase                 String                 @db.VarChar(50)
+  workoutType           String                 @map("workout_type") @db.VarChar(100)
+  sortOrder             Int                    @map("sort_order")
+  notes                 String?
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
   exercisePrescriptions ExercisePrescription[]
   trainingLogs          TrainingLog[]
+  programWeek           ProgramWeek            @relation(fields: [programWeekId], references: [id], onDelete: Cascade)
   workoutSessions       WorkoutSession[]
 
   @@index([programWeekId])
@@ -166,55 +139,46 @@ model WorkoutDay {
   @@map("workout_days")
 }
 
-// ─── Exercises ────────────────────────────────────────────────────────────────
-
 model Exercise {
-  id               String    @id @default(uuid())
-  name             String    @unique @db.VarChar(255)
-  // Legacy fields (kept for backward compatibility with existing program/workout flow)
-  category         String?   @db.VarChar(100)
-  muscleGroup      String?   @map("muscle_group") @db.VarChar(100)
-  equipment        String?   @db.VarChar(100)
-  // Extended taxonomy
-  bodyPart         String?   @map("body_part") @db.VarChar(100)
-  primaryMuscle    String?   @map("primary_muscle") @db.VarChar(100)
-  secondaryMuscles Json?     @map("secondary_muscles") // String[]
-  movementPattern  String?   @map("movement_pattern") @db.VarChar(100)
-  exerciseType     String?   @map("exercise_type") @db.VarChar(50)
-  goalTags         Json?     @map("goal_tags") // String[]
-  difficulty       String?   @db.VarChar(50)
-  instructions     String?
-  mediaUrl         String?   @map("media_url") @db.VarChar(500)
-  videoUrl         String?   @map("video_url") @db.VarChar(500)
-  isCompound       Boolean   @default(false) @map("is_compound")
-  isUnilateral     Boolean   @default(false) @map("is_unilateral")
-  // External data source tracking
-  externalId       String?   @map("external_id") @db.VarChar(255)   // ID from the external source (e.g. ExerciseDB "0001")
-  externalSource   String?   @map("external_source") @db.VarChar(100) // e.g. "exercisedb" | "local"
-  lastSyncedAt     DateTime? @map("last_synced_at")                  // When this record was last synced from the external source
-  // Status
-  isActive         Boolean   @default(true) @map("is_active")
-  deletedAt        DateTime? @map("deleted_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-
+  id                        String                   @id @default(uuid())
+  name                      String                   @unique @db.VarChar(255)
+  category                  String?                  @db.VarChar(100)
+  muscleGroup               String?                  @map("muscle_group") @db.VarChar(100)
+  equipment                 String?                  @db.VarChar(100)
+  isActive                  Boolean                  @default(true) @map("is_active")
+  deletedAt                 DateTime?                @map("deleted_at")
+  createdAt                 DateTime                 @default(now()) @map("created_at")
+  updatedAt                 DateTime                 @updatedAt @map("updated_at")
+  bodyPart                  String?                  @map("body_part") @db.VarChar(100)
+  difficulty                String?                  @db.VarChar(50)
+  exerciseType              String?                  @map("exercise_type") @db.VarChar(50)
+  goalTags                  Json?                    @map("goal_tags")
+  instructions              String?
+  isCompound                Boolean                  @default(false) @map("is_compound")
+  isUnilateral              Boolean                  @default(false) @map("is_unilateral")
+  mediaUrl                  String?                  @map("media_url") @db.VarChar(500)
+  movementPattern           String?                  @map("movement_pattern") @db.VarChar(100)
+  primaryMuscle             String?                  @map("primary_muscle") @db.VarChar(100)
+  secondaryMuscles          Json?                    @map("secondary_muscles")
+  videoUrl                  String?                  @map("video_url") @db.VarChar(500)
+  externalId                String?                  @map("external_id") @db.VarChar(255)
+  externalSource            String?                  @map("external_source") @db.VarChar(100)
+  lastSyncedAt              DateTime?                @map("last_synced_at")
+  preferences               ExercisePreference[]
   exercisePrescriptions     ExercisePrescription[]
-  substitutionsAsOriginal   ExerciseSubstitution[] @relation("OriginalExercise")
-  substitutionsAsSubstitute ExerciseSubstitution[] @relation("SubstituteExercise")
+  substitutionsAsOriginal   ExerciseSubstitution[]   @relation("OriginalExercise")
+  substitutionsAsSubstitute ExerciseSubstitution[]   @relation("SubstituteExercise")
   trainingLogs              TrainingLog[]
   userExerciseWeights       UserExerciseWeight[]
   sessionExercises          WorkoutSessionExercise[]
-  preferences               ExercisePreference[]
 
-  @@unique([externalId, externalSource]) // Prevents duplicate imports; NULL values are distinct in PostgreSQL so existing rows are unaffected
+  @@unique([externalId, externalSource])
   @@index([movementPattern])
   @@index([exerciseType])
   @@index([difficulty])
   @@index([externalSource])
   @@map("exercises")
 }
-
-// ─── Exercise Substitutions ───────────────────────────────────────────────────
 
 model ExerciseSubstitution {
   id                   String   @id @default(uuid())
@@ -223,39 +187,33 @@ model ExerciseSubstitution {
   priorityRank         Int      @default(1) @map("priority_rank")
   notes                String?
   createdAt            DateTime @default(now()) @map("created_at")
-
-  exercise           Exercise @relation("OriginalExercise", fields: [exerciseId], references: [id])
-  substituteExercise Exercise @relation("SubstituteExercise", fields: [substituteExerciseId], references: [id])
+  exercise             Exercise @relation("OriginalExercise", fields: [exerciseId], references: [id])
+  substituteExercise   Exercise @relation("SubstituteExercise", fields: [substituteExerciseId], references: [id])
 
   @@unique([exerciseId, substituteExerciseId])
   @@map("exercise_substitutions")
 }
 
-// ─── Exercise Prescriptions ───────────────────────────────────────────────────
-
 model ExercisePrescription {
-  id             String   @id @default(uuid())
-  workoutDayId   String   @map("workout_day_id")
-  exerciseId     String   @map("exercise_id")
-  targetRepRange String?  @map("target_rep_range") @db.VarChar(50)
-  incrementValue Decimal  @default(0) @map("increment_value") @db.Decimal(6, 2)
-  incrementUnit  String   @default("lb") @map("increment_unit") @db.VarChar(20)
+  id             String        @id @default(uuid())
+  workoutDayId   String        @map("workout_day_id")
+  exerciseId     String        @map("exercise_id")
+  targetRepRange String?       @map("target_rep_range") @db.VarChar(50)
+  incrementValue Decimal       @default(0) @map("increment_value") @db.Decimal(6, 2)
+  incrementUnit  String        @default("lb") @map("increment_unit") @db.VarChar(20)
   notes          String?
-  sortOrder      Int      @map("sort_order")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  workoutDay   WorkoutDay    @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
-  exercise     Exercise      @relation(fields: [exerciseId], references: [id])
-  trainingLogs TrainingLog[]
+  sortOrder      Int           @map("sort_order")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  exercise       Exercise      @relation(fields: [exerciseId], references: [id])
+  workoutDay     WorkoutDay    @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
+  trainingLogs   TrainingLog[]
 
   @@index([workoutDayId])
   @@index([exerciseId])
   @@index([sortOrder])
   @@map("exercise_prescriptions")
 }
-
-// ─── User Program Assignments ─────────────────────────────────────────────────
 
 model UserProgramAssignment {
   id         String    @id @default(uuid())
@@ -267,50 +225,46 @@ model UserProgramAssignment {
   isActive   Boolean   @default(true) @map("is_active")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program Program @relation(fields: [programId], references: [id])
+  program    Program   @relation(fields: [programId], references: [id])
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([programId])
   @@map("user_program_assignments")
 }
 
-// ─── Training Logs ────────────────────────────────────────────────────────────
-
 model TrainingLog {
-  id                     String    @id @default(uuid())
-  userId                 String    @map("user_id")
-  programId              String?   @map("program_id")
-  programWeekId          String?   @map("program_week_id")
-  workoutDayId           String?   @map("workout_day_id")
-  exercisePrescriptionId String?   @map("exercise_prescription_id")
-  exerciseId             String    @map("exercise_id")
-  sessionDate            DateTime  @map("session_date") @db.Date
-  weight                 Decimal?  @db.Decimal(8, 2)
-  weightUnit             String    @default("lb") @map("weight_unit") @db.VarChar(20)
-  set1Reps               Int?      @map("set_1_reps")
-  set2Reps               Int?      @map("set_2_reps")
-  set3Reps               Int?      @map("set_3_reps")
-  set4Reps               Int?      @map("set_4_reps")
+  id                     String                @id @default(uuid())
+  userId                 String                @map("user_id")
+  programId              String?               @map("program_id")
+  programWeekId          String?               @map("program_week_id")
+  workoutDayId           String?               @map("workout_day_id")
+  exercisePrescriptionId String?               @map("exercise_prescription_id")
+  exerciseId             String                @map("exercise_id")
+  sessionDate            DateTime              @map("session_date") @db.Date
+  weight                 Decimal?              @db.Decimal(8, 2)
+  weightUnit             String                @default("lb") @map("weight_unit") @db.VarChar(20)
+  set1Reps               Int?                  @map("set_1_reps")
+  set2Reps               Int?                  @map("set_2_reps")
+  set3Reps               Int?                  @map("set_3_reps")
+  set4Reps               Int?                  @map("set_4_reps")
   rir                    Int?
-  totalReps              Int?      @map("total_reps")
-  lowerRep               Int?      @map("lower_rep")
-  upperRep               Int?      @map("upper_rep")
-  readyToIncrease        Boolean?  @map("ready_to_increase")
-  nextWeight             Decimal?  @map("next_weight") @db.Decimal(8, 2)
-  status                 String?   @db.VarChar(20)
-  progressionConfirmed   Boolean   @default(false) @map("progression_confirmed")
+  totalReps              Int?                  @map("total_reps")
+  lowerRep               Int?                  @map("lower_rep")
+  upperRep               Int?                  @map("upper_rep")
+  readyToIncrease        Boolean?              @map("ready_to_increase")
+  nextWeight             Decimal?              @map("next_weight") @db.Decimal(8, 2)
+  status                 String?               @db.VarChar(20)
   notes                  String?
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @updatedAt @map("updated_at")
-
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program              Program?              @relation(fields: [programId], references: [id])
-  programWeek          ProgramWeek?          @relation(fields: [programWeekId], references: [id])
-  workoutDay           WorkoutDay?           @relation(fields: [workoutDayId], references: [id])
-  exercisePrescription ExercisePrescription? @relation(fields: [exercisePrescriptionId], references: [id])
-  exercise             Exercise              @relation(fields: [exerciseId], references: [id])
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  progressionConfirmed   Boolean               @default(false) @map("progression_confirmed")
+  exercise               Exercise              @relation(fields: [exerciseId], references: [id])
+  exercisePrescription   ExercisePrescription? @relation(fields: [exercisePrescriptionId], references: [id])
+  program                Program?              @relation(fields: [programId], references: [id])
+  programWeek            ProgramWeek?          @relation(fields: [programWeekId], references: [id])
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDay             WorkoutDay?           @relation(fields: [workoutDayId], references: [id])
 
   @@index([userId])
   @@index([sessionDate])
@@ -320,8 +274,6 @@ model TrainingLog {
   @@index([userId, exerciseId, sessionDate])
   @@map("training_logs")
 }
-
-// ─── Body Metrics ─────────────────────────────────────────────────────────────
 
 model BodyMetric {
   id                       String   @id @default(uuid())
@@ -339,8 +291,7 @@ model BodyMetric {
   notes                    String?
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, entryDate])
   @@index([userId])
@@ -348,122 +299,106 @@ model BodyMetric {
   @@map("body_metrics")
 }
 
-// ─── User Exercise Weights ────────────────────────────────────────────────────
-// Stores the confirmed working weight per user per exercise, updated each time
-// the user confirms a progression. Used as suggested weight on the workout page.
-
 model UserExerciseWeight {
-  id                   String   @id @default(uuid())
-  userId               String   @map("user_id")
-  exerciseId           String   @map("exercise_id")
-  currentWeight        Decimal  @map("current_weight") @db.Decimal(8, 2)
-  weightUnit           String   @default("kg") @map("weight_unit") @db.VarChar(20)
-  preferredIncrementPct Float   @default(2.5) @map("preferred_increment_pct") @db.DoublePrecision
-  confirmedAt          DateTime @default(now()) @map("confirmed_at")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  id                    String   @id @default(uuid())
+  userId                String   @map("user_id")
+  exerciseId            String   @map("exercise_id")
+  currentWeight         Decimal  @map("current_weight") @db.Decimal(8, 2)
+  weightUnit            String   @default("kg") @map("weight_unit") @db.VarChar(20)
+  preferredIncrementPct Float    @default(2.5) @map("preferred_increment_pct")
+  confirmedAt           DateTime @default(now()) @map("confirmed_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  exercise              Exercise @relation(fields: [exerciseId], references: [id])
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, exerciseId])
   @@index([userId])
   @@map("user_exercise_weights")
 }
 
-// ─── Workout Sessions ─────────────────────────────────────────────────────────
-
 model WorkoutSession {
-  id                   String    @id @default(uuid())
-  userId               String    @map("user_id")
-  workoutDayId         String?   @map("workout_day_id")
-  startedAt            DateTime  @default(now()) @map("started_at")
-  finishedAt           DateTime? @map("finished_at")
-  durationSec          Int?      @map("duration_sec")
-  status               String    @default("in_progress") @db.VarChar(20) // in_progress, completed, abandoned
-  totalVolume          Decimal?  @db.Decimal(12, 2) @map("total_volume")
-  estimatedCalories    Int?      @map("estimated_calories")
-  completedExerciseCount Int     @default(0) @map("completed_exercise_count")
-  notes                String?
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDay WorkoutDay? @relation(fields: [workoutDayId], references: [id])
-  exercises  WorkoutSessionExercise[]
+  id                     String                   @id @default(uuid())
+  userId                 String                   @map("user_id")
+  workoutDayId           String?                  @map("workout_day_id")
+  startedAt              DateTime                 @default(now()) @map("started_at")
+  finishedAt             DateTime?                @map("finished_at")
+  durationSec            Int?                     @map("duration_sec")
+  status                 String                   @default("in_progress") @db.VarChar(20)
+  totalVolume            Decimal?                 @map("total_volume") @db.Decimal(12, 2)
+  estimatedCalories      Int?                     @map("estimated_calories")
+  completedExerciseCount Int                      @default(0) @map("completed_exercise_count")
+  syncToAppleHealth      Boolean                  @default(false) @map("sync_to_apple_health")
+  postToStrava           Boolean                  @default(false) @map("post_to_strava")
+  postToFitbit           Boolean                  @default(false) @map("post_to_fitbit")
+  notes                  String?
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  exercises              WorkoutSessionExercise[]
+  user                   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDay             WorkoutDay?              @relation(fields: [workoutDayId], references: [id])
 
   @@index([userId])
   @@index([status])
   @@map("workout_sessions")
 }
 
-// ─── Workout Session Exercises ────────────────────────────────────────────────
-
 model WorkoutSessionExercise {
-  id                   String   @id @default(uuid())
-  sessionId            String   @map("session_id")
-  exerciseId           String   @map("exercise_id")
-  workoutExerciseId    String?  @map("workout_exercise_id") // Reference to original template if applicable
-  orderIndex           Int      @map("order_index")
-  wasReplaced          Boolean  @default(false) @map("was_replaced")
-  replacementReason    String?  @map("replacement_reason")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  exercise Exercise       @relation(fields: [exerciseId], references: [id])
-  sets     LoggedSet[]
+  id                String         @id @default(uuid())
+  sessionId         String         @map("session_id")
+  exerciseId        String         @map("exercise_id")
+  workoutExerciseId String?        @map("workout_exercise_id")
+  orderIndex        Int            @map("order_index")
+  wasReplaced       Boolean        @default(false) @map("was_replaced")
+  replacementReason String?        @map("replacement_reason")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  sets              LoggedSet[]
+  exercise          Exercise       @relation(fields: [exerciseId], references: [id])
+  session           WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([exerciseId])
   @@map("workout_session_exercises")
 }
 
-// ─── Logged Sets ─────────────────────────────────────────────────────────────
-
 model LoggedSet {
-  id                    String   @id @default(uuid())
-  sessionExerciseId     String   @map("session_exercise_id")
-  setType               String   @default("working") @map("set_type") @db.VarChar(20) // warmup, working, dropset, failure
-  setOrder              Int      @map("set_order")
-  targetReps            Int?     @map("target_reps")
-  actualReps            Int?     @map("actual_reps")
-  targetWeight          Decimal? @map("target_weight") @db.Decimal(8, 2)
-  actualWeight          Decimal? @map("actual_weight") @db.Decimal(8, 2)
-  unit                  String   @default("kg") @db.VarChar(20)
-  rir                   Int?     @map("rir") // Reps in Reserve
-  rpe                   Decimal? @map("rpe") @db.Decimal(3, 1) // Rate of Perceived Exertion
-  completed             Boolean  @default(false)
-  completedAt           DateTime? @map("completed_at")
-  restAfterSec          Int?     @map("rest_after_sec")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  sessionExercise WorkoutSessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+  id                String                 @id @default(uuid())
+  sessionExerciseId String                 @map("session_exercise_id")
+  setType           String                 @default("working") @map("set_type") @db.VarChar(20)
+  setOrder          Int                    @map("set_order")
+  targetReps        Int?                   @map("target_reps")
+  actualReps        Int?                   @map("actual_reps")
+  targetWeight      Decimal?               @map("target_weight") @db.Decimal(8, 2)
+  actualWeight      Decimal?               @map("actual_weight") @db.Decimal(8, 2)
+  unit              String                 @default("kg") @db.VarChar(20)
+  rir               Int?                   @map("rir")
+  rpe               Decimal?               @map("rpe") @db.Decimal(3, 1)
+  completed         Boolean                @default(false)
+  completedAt       DateTime?              @map("completed_at")
+  restAfterSec      Int?                   @map("rest_after_sec")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  sessionExercise   WorkoutSessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
 
   @@index([sessionExerciseId])
   @@map("logged_sets")
 }
 
-// ─── Exercise Preferences ────────────────────────────────────────────────────
-
 model ExercisePreference {
   id             String   @id @default(uuid())
   userId         String   @map("user_id")
   exerciseId     String   @map("exercise_id")
-  preferenceType String   @map("preference_type") @db.VarChar(50) // more_often, less_often, exclude
+  preferenceType String   @map("preference_type") @db.VarChar(50)
   source         String   @default("user_action") @db.VarChar(50)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  exercise       Exercise @relation(fields: [exerciseId], references: [id])
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, exerciseId])
   @@map("exercise_preferences")
 }
-
-// ─── Weekly Progress ──────────────────────────────────────────────────────────
 
 model WeeklyProgress {
   id                String   @id @default(uuid())
@@ -475,99 +410,91 @@ model WeeklyProgress {
   milestoneState    Json?    @map("milestone_state")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, weekStartDate])
   @@map("weekly_progress")
 }
 
-// ─── Profiles & Onboarding ───────────────────────────────────────────────────
-
 model UserProfile {
-  id                  String    @id @default(uuid())
-  userId              String    @unique @map("user_id")
-  gender              String?   @db.VarChar(50)
-  dateOfBirth         DateTime? @map("date_of_birth") @db.Date
-  heightValue         Decimal?  @map("height_value") @db.Decimal(6, 2)
-  heightUnit          String    @default("cm") @map("height_unit") @db.VarChar(10)
-  weightValue         Decimal?  @map("weight_value") @db.Decimal(6, 2)
-  weightUnit          String    @default("kg") @map("weight_unit") @db.VarChar(10)
-  preferredWeightUnit String    @default("lb") @map("preferred_weight_unit") @db.VarChar(10)
+  id                   String    @id @default(uuid())
+  userId               String    @unique @map("user_id")
+  gender               String?   @db.VarChar(50)
+  dateOfBirth          DateTime? @map("date_of_birth") @db.Date
+  heightValue          Decimal?  @map("height_value") @db.Decimal(6, 2)
+  heightUnit           String    @default("cm") @map("height_unit") @db.VarChar(10)
+  weightValue          Decimal?  @map("weight_value") @db.Decimal(6, 2)
+  weightUnit           String    @default("kg") @map("weight_unit") @db.VarChar(10)
+  preferredWeightUnit  String    @default("lb") @map("preferred_weight_unit") @db.VarChar(10)
   appleHealthConnected Boolean   @default(false) @map("apple_health_connected")
-  lastHealthSyncAt    DateTime? @map("last_health_sync_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastHealthSyncAt     DateTime? @map("last_health_sync_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
 }
 
 model OnboardingProfile {
-  id                String    @id @default(uuid())
-  userId            String?   @unique @map("user_id")
-  goal              String?   @db.VarChar(50)
-  consistency       String?   @db.VarChar(50)
-  experience        String?   @db.VarChar(50)
-  environment       String?   @db.VarChar(50)
-  workoutsPerWeek   Int?      @map("workouts_per_week")
-  specificDays      Json?     @map("specific_days")
-  bodyStatsSnapshot Json?     @map("body_stats_snapshot")
-  notificationOptIn Boolean   @default(false) @map("notification_opt_in")
-  notificationTime  String?   @map("notification_time") // Store as HH:mm
-  completedAt       DateTime? @map("completed_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-
-  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                String             @id @default(uuid())
+  userId            String?            @unique @map("user_id")
+  goal              String?            @db.VarChar(50)
+  consistency       String?            @db.VarChar(50)
+  experience        String?            @db.VarChar(50)
+  environment       String?            @db.VarChar(50)
+  workoutsPerWeek   Int?               @map("workouts_per_week")
+  specificDays      Json?              @map("specific_days")
+  bodyStatsSnapshot Json?              @map("body_stats_snapshot")
+  notificationOptIn Boolean            @default(false) @map("notification_opt_in")
+  notificationTime  String?            @map("notification_time")
+  completedAt       DateTime?          @map("completed_at")
+  referralSource    String?            @map("referral_source") @db.VarChar(100)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  bestLifts         Json?              @map("best_lifts")
   equipmentProfiles EquipmentProfile[]
+  user              User?              @relation(fields: [userId], references: [id])
 
   @@map("onboarding_profiles")
 }
 
 model NotificationPreference {
-  id                    String    @id @default(uuid())
-  userId                String    @unique @map("user_id")
-  workoutPreviewEnabled Boolean   @default(false) @map("workout_preview_enabled")
-  workoutPreviewTime    String?   @map("workout_preview_time")
-  pushEnabled           Boolean   @default(false) @map("push_enabled")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(uuid())
+  userId                String   @unique @map("user_id")
+  workoutPreviewEnabled Boolean  @default(false) @map("workout_preview_enabled")
+  workoutPreviewTime    String?  @map("workout_preview_time")
+  pushEnabled           Boolean  @default(false) @map("push_enabled")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
 }
 
-// ─── Equipment & Environment ──────────────────────────────────────────────────
-
 model EquipmentProfile {
-  id                  String    @id @default(uuid())
-  userId              String?   @map("user_id")
-  onboardingProfileId String?   @map("onboarding_profile_id")
-  name                String    @db.VarChar(255)
-  environmentType     String?   @map("environment_type") @db.VarChar(50)
-  isDefault           Boolean   @default(false) @map("is_default")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  onboardingProfile OnboardingProfile? @relation(fields: [onboardingProfileId], references: [id])
-  items             EquipmentProfileItem[]
+  id                  String                 @id @default(uuid())
+  userId              String?                @map("user_id")
+  onboardingProfileId String?                @map("onboarding_profile_id")
+  name                String                 @db.VarChar(255)
+  environmentType     String?                @map("environment_type") @db.VarChar(50)
+  isDefault           Boolean                @default(false) @map("is_default")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  items               EquipmentProfileItem[]
+  onboardingProfile   OnboardingProfile?     @relation(fields: [onboardingProfileId], references: [id])
+  user                User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("equipment_profiles")
 }
 
 model EquipmentProfileItem {
-  id                 String   @id @default(uuid())
-  equipmentProfileId String   @map("equipment_profile_id")
-  equipmentCode      String   @map("equipment_code") @db.VarChar(100)
-  label              String   @db.VarChar(255)
+  id                 String           @id @default(uuid())
+  equipmentProfileId String           @map("equipment_profile_id")
+  equipmentCode      String           @map("equipment_code") @db.VarChar(100)
+  label              String           @db.VarChar(255)
   metadata           Json?
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  equipmentProfile EquipmentProfile @relation(fields: [equipmentProfileId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  equipmentProfile   EquipmentProfile @relation(fields: [equipmentProfileId], references: [id], onDelete: Cascade)
 
   @@map("equipment_profile_items")
 }

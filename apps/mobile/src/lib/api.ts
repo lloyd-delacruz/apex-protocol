@@ -10,7 +10,7 @@ import { createApiClient } from '@apex/shared';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.26.81.24:4001';
 const TOKEN_KEY = 'apex_token';
 const REFRESH_TOKEN_KEY = 'apex_refresh_token';
 

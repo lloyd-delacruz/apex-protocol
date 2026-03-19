@@ -92,16 +92,74 @@ export function createApiClient(options: ApiClientOptions) {
 
     assign: (id: string, startDate?: string) =>
       request<unknown>('POST', `/api/programs/${id}/assign`, { startDate }),
+
+    generate: (data: any) =>
+      request<{ id: string }>('POST', '/api/programs/generate', data),
+  };
+
+  // ─── Profiles ──────────────────────────────────────────────────────────────
+
+  const profiles = {
+    getOnboarding: () =>
+      request<unknown>('GET', '/api/profiles/onboarding'),
+
+    saveOnboarding: (data: any) =>
+      request<unknown>('POST', '/api/profiles/onboarding', data),
+
+    saveUser: (data: any) =>
+      request<unknown>('POST', '/api/profiles/user', data),
+
+    getNotifications: () =>
+      request<unknown>('GET', '/api/profiles/notifications'),
+
+    saveNotifications: (data: any) =>
+      request<unknown>('POST', '/api/profiles/notifications', data),
   };
 
   // ─── Workouts ──────────────────────────────────────────────────────────────
 
   const workouts = {
     today: () =>
-      request<{ workout: unknown }>('GET', '/api/workouts/today'),
+      request<unknown>('GET', '/api/workouts/today'),
 
     getByWeekAndDay: (programId: string, week: number, day: number) =>
       request<{ workoutDay: unknown }>('GET', `/api/workouts/${programId}/${week}/${day}`),
+
+    startSession: (data: { workoutDayId: string }) =>
+      request<{ session: { id: string }; sessionExercises: any[] }>('POST', '/api/workouts/session/start', data),
+
+    logSet: (sessionExerciseId: string, data: any) =>
+      request<unknown>('POST', `/api/workouts/session/exercises/${sessionExerciseId}/sets`, data),
+
+    finishSession: (data: { sessionId: string }) =>
+      request<unknown>('POST', '/api/workouts/session/finish', data),
+
+    addSessionExercise: (data: { sessionId: string; exerciseId: string; orderIndex?: number }) =>
+      request<unknown>('POST', '/api/workouts/session/exercises', data),
+
+    updateSessionExercise: (sessionExerciseId: string, exerciseId: string) =>
+      request<unknown>('PATCH', `/api/workouts/session/exercises/${sessionExerciseId}`, { exerciseId }),
+
+    removeSessionExercise: (sessionExerciseId: string) =>
+      request<unknown>('DELETE', `/api/workouts/session/exercises/${sessionExerciseId}`),
+  };
+
+  // ─── Exercises ─────────────────────────────────────────────────────────────
+
+  const exercises = {
+    list: (params?: any) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<{ exercises: any[]; total: number }>('GET', `/api/exercises${qs}`);
+    },
+
+    search: (q: string) =>
+      request<{ exercises: any[] }>('GET', `/api/exercises/search?q=${encodeURIComponent(q)}`),
+
+    get: (id: string) =>
+      request<{ exercise: any }>('GET', `/api/exercises/${id}`),
+
+    getSubstitutions: (id: string) =>
+      request<{ substitutions: any[] }>('GET', `/api/exercises/${id}/substitutions`),
   };
 
   // ─── Training Log ──────────────────────────────────────────────────────────
@@ -185,7 +243,7 @@ export function createApiClient(options: ApiClientOptions) {
       }>('GET', '/api/analytics/dashboard'),
   };
 
-  return { auth, programs, workouts, trainingLog, metrics, analytics, request };
+  return { auth, programs, profiles, workouts, exercises, trainingLog, metrics, analytics, request };
 }
 
 export type ApexApiClient = ReturnType<typeof createApiClient>;

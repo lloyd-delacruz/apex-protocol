@@ -8,11 +8,15 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, statusColors, statusBackgrounds } from '../theme/colors';
 import { TrainingStatus } from '@apex/shared';
 import api from '../lib/api';
+
+const { width } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,11 +53,11 @@ function MiniBarChart({ data }: { data: Array<{ label: string; value: number }> 
 }
 
 const barStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 6, paddingBottom: 18 },
+  container: { flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 8, paddingBottom: 24 },
   barWrapper: { flex: 1, alignItems: 'center', height: '100%' },
-  barTrack: { flex: 1, width: '100%', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 3, justifyContent: 'flex-end', overflow: 'hidden' },
-  barFill: { width: '100%', backgroundColor: colors.accent, borderRadius: 3, opacity: 0.8 },
-  barLabel: { fontSize: 9, color: colors.textMuted, marginTop: 4, position: 'absolute', bottom: 0 },
+  barTrack: { flex: 1, width: '100%', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 4, justifyContent: 'flex-end', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  barFill: { width: '100%', backgroundColor: colors.brandPrimary, borderRadius: 3, opacity: 0.9 },
+  barLabel: { fontSize: 9, color: colors.textMuted, marginTop: 6, fontWeight: '600' },
 });
 
 // ─── Trend dot line ───────────────────────────────────────────────────────────
@@ -61,11 +65,11 @@ const barStyles = StyleSheet.create({
 function TrendDotLine({ data }: { data: Array<{ weight: number; date: string }> }) {
   const last7 = data.slice(-7);
   return (
-    <View style={{ flexDirection: 'row', gap: 4, alignItems: 'flex-end' }}>
+    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10 }}>
       {last7.map((point, i) => (
         <View key={i} style={trendStyles.point}>
+          <Text style={trendStyles.weightLabel}>{point.weight}k</Text>
           <View style={[trendStyles.dot, i === last7.length - 1 && trendStyles.dotActive]} />
-          <Text style={trendStyles.weightLabel}>{point.weight}kg</Text>
           <Text style={trendStyles.dateLabel}>
             {new Date(point.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
           </Text>
@@ -76,10 +80,10 @@ function TrendDotLine({ data }: { data: Array<{ weight: number; date: string }> 
 }
 
 const trendStyles = StyleSheet.create({
-  point: { flex: 1, alignItems: 'center', gap: 2 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: `${colors.accent}40` },
-  dotActive: { backgroundColor: colors.accent, width: 10, height: 10 },
-  weightLabel: { fontSize: 9, color: colors.textPrimary, fontWeight: '600' },
+  point: { alignItems: 'center', gap: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(0, 194, 255, 0.2)', borderWidth: 1, borderColor: 'rgba(0, 194, 255, 0.4)' },
+  dotActive: { backgroundColor: colors.brandPrimary, width: 12, height: 12, borderRadius: 6, borderColor: '#fff' },
+  weightLabel: { fontSize: 10, color: colors.textPrimary, fontWeight: '800' },
   dateLabel: { fontSize: 8, color: colors.textMuted },
 });
 
@@ -102,12 +106,12 @@ export default function ProgressScreen() {
         }
       }
     } catch {
-      // Silently fail — show empty states
+      // Empty state
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedExercise]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -115,15 +119,15 @@ export default function ProgressScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={styles.centeredState}>
+          <ActivityIndicator size="large" color={colors.brandPrimary} />
+        </SafeAreaView>
+      </View>
     );
   }
 
-  // ── Derived data ──────────────────────────────────────────────────────────
   const trends = analytics?.strengthTrends ?? [];
   const currentTrend = trends.find((t) => t.exercise === selectedExercise) ?? trends[0] ?? null;
   const weeklyVolumeData = (analytics?.weeklyVolume ?? []).slice(-6).map((w) => ({
@@ -135,229 +139,161 @@ export default function ProgressScreen() {
   const streak = analytics?.adherence?.streak ?? 0;
   const breakdown = analytics?.statusBreakdown;
 
-  const achievedPct = breakdown && breakdown.total > 0
-    ? Math.round((breakdown.achieved / breakdown.total) * 100)
-    : null;
-
-  const progressPct = breakdown && breakdown.total > 0
-    ? Math.round((breakdown.progress / breakdown.total) * 100)
-    : null;
-
-  const failedPct = breakdown && breakdown.total > 0
-    ? Math.round((breakdown.failed / breakdown.total) * 100)
-    : null;
+  const achievedPct = breakdown && breakdown.total > 0 ? Math.round((breakdown.achieved / breakdown.total) * 100) : 0;
+  const progressPct = breakdown && breakdown.total > 0 ? Math.round((breakdown.progress / breakdown.total) * 100) : 0;
+  const failedPct = breakdown && breakdown.total > 0 ? Math.round((breakdown.failed / breakdown.total) * 100) : 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-      >
-        <Text style={styles.pageTitle}>Progress</Text>
+    <View style={styles.container}>
+      <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandPrimary} />}
+        >
+          <Text style={styles.pageTitle}>EVOLUTION{'\n'}<Text style={styles.italic}>ANALYTICS</Text></Text>
 
-        {/* ── Stats row ────────────────────────────────────────────── */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Sessions</Text>
-            <Text style={[styles.statValue, { color: colors.textPrimary }]}>{sessions}</Text>
-            <Text style={styles.statSub}>last 4 weeks</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Streak</Text>
-            <Text style={[styles.statValue, { color: colors.accent }]}>{streak}d</Text>
-            <Text style={styles.statSub}>current</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Achieved</Text>
-            <Text style={[styles.statValue, { color: colors.success }]}>
-              {achievedPct !== null ? `${achievedPct}%` : '—'}
-            </Text>
-            <Text style={styles.statSub}>of all sets</Text>
-          </View>
-        </View>
-
-        {/* ── Weight progression ────────────────────────────────────── */}
-        {trends.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Weight Progression</Text>
-
-            <View style={styles.exerciseSelector}>
-              {trends.map((t) => (
-                <TouchableOpacity
-                  key={t.exercise}
-                  style={[styles.exercisePill, selectedExercise === t.exercise && styles.exercisePillActive]}
-                  onPress={() => setSelectedExercise(t.exercise)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.exercisePillText, selectedExercise === t.exercise && styles.exercisePillTextActive]}>
-                    {t.exercise}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Sessions</Text>
+              <Text style={styles.statValue}>{sessions}</Text>
+              <Text style={styles.statSub}>LAST 30D</Text>
             </View>
-
-            {currentTrend && currentTrend.dataPoints.length > 0 && (
-              <View style={styles.progressionCard}>
-                <View style={styles.progressionStats}>
-                  <View>
-                    <Text style={styles.statLabel}>Start</Text>
-                    <Text style={styles.progressWeight}>{currentTrend.dataPoints[0].weight}kg</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.statLabel}>Current</Text>
-                    <Text style={styles.progressWeight}>{currentTrend.currentWeight}kg</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.statLabel}>Change</Text>
-                    <Text style={[styles.progressWeight, { color: currentTrend.weightChangePct >= 0 ? colors.success : colors.danger }]}>
-                      {currentTrend.weightChangePct >= 0 ? '+' : ''}{currentTrend.weightChangePct.toFixed(1)}%
-                    </Text>
-                  </View>
-                </View>
-                <TrendDotLine data={currentTrend.dataPoints} />
-              </View>
-            )}
-
-            {(!currentTrend || currentTrend.dataPoints.length === 0) && (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>No data yet. Log some workouts to see progression.</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ── Weekly volume ─────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Volume</Text>
-          <View style={styles.card}>
-            {weeklyVolumeData.length > 0 ? (
-              <>
-                <View style={styles.volumeHeader}>
-                  <Text style={styles.statLabel}>This week</Text>
-                  <Text style={[styles.progressWeight, { color: colors.accent }]}>
-                    {weeklyVolumeData[weeklyVolumeData.length - 1]?.value?.toLocaleString() ?? '0'} kg
-                  </Text>
-                </View>
-                <MiniBarChart data={weeklyVolumeData} />
-              </>
-            ) : (
-              <Text style={styles.emptyText}>No volume data yet.</Text>
-            )}
-          </View>
-        </View>
-
-        {/* ── Status breakdown ──────────────────────────────────────── */}
-        {breakdown && breakdown.total > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Set Status Breakdown</Text>
-            <View style={styles.card}>
-              {[
-                { label: 'Achieved', value: achievedPct ?? 0, color: colors.success },
-                { label: 'In Progress', value: progressPct ?? 0, color: colors.accent },
-                { label: 'Failed', value: failedPct ?? 0, color: colors.danger },
-              ].map((item) => (
-                <View key={item.label} style={styles.breakdownRow}>
-                  <View style={styles.breakdownLeft}>
-                    <View style={[styles.breakdownDot, { backgroundColor: item.color }]} />
-                    <Text style={styles.breakdownLabel}>{item.label}</Text>
-                  </View>
-                  <View style={styles.breakdownRight}>
-                    <View style={[styles.breakdownBar, { backgroundColor: `${item.color}20` }]}>
-                      <View style={[styles.breakdownBarFill, { width: `${item.value}%`, backgroundColor: item.color }]} />
-                    </View>
-                    <Text style={[styles.breakdownPct, { color: item.color }]}>{item.value}%</Text>
-                  </View>
-                </View>
-              ))}
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Streak</Text>
+              <Text style={[styles.statValue, { color: colors.brandPrimary }]}>{streak}d</Text>
+              <Text style={styles.statSub}>CURRENT</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Achieved</Text>
+              <Text style={[styles.statValue, { color: colors.success }]}>{achievedPct}%</Text>
+              <Text style={styles.statSub}>SET TARGETS</Text>
             </View>
           </View>
-        )}
 
-        {/* ── Top progressing exercises ─────────────────────────────── */}
-        {trends.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Top Progressing Exercises</Text>
-            <View style={styles.card}>
-              {trends.map((trend, idx) => {
-                const status: TrainingStatus = trend.weightChangePct >= 0 ? 'ACHIEVED' : 'PROGRESS';
-                return (
-                  <View key={trend.exercise} style={[styles.topExRow, idx < trends.length - 1 && styles.topExRowBorder]}>
-                    <Text style={styles.topExRank}>{idx + 1}</Text>
-                    <Text style={styles.topExName}>{trend.exercise}</Text>
-                    <View style={styles.topExStats}>
-                      <Text style={[styles.topExChange, { color: trend.weightChangePct >= 0 ? colors.success : colors.danger }]}>
-                        {trend.weightChangePct >= 0 ? '+' : ''}{trend.weightChangePct.toFixed(1)}%
-                      </Text>
-                      <Text style={styles.topExWeight}>{trend.currentWeight}kg</Text>
+          {/* Strength Progression */}
+          {trends.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Strength Evolution</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exerciseSelector}>
+                {trends.map((t) => (
+                  <TouchableOpacity
+                    key={t.exercise}
+                    style={[styles.exercisePill, selectedExercise === t.exercise && styles.exercisePillActive]}
+                    onPress={() => setSelectedExercise(t.exercise)}
+                  >
+                    <Text style={[styles.pillText, selectedExercise === t.exercise && styles.pillTextActive]}>{t.exercise}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {currentTrend && (
+                <View style={styles.glassCard}>
+                  <View style={styles.trendHeader}>
+                    <View>
+                      <Text style={styles.cardStatLabel}>Peak Force</Text>
+                      <Text style={styles.cardStatValue}>{currentTrend.currentWeight}kg</Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: statusBackgrounds[status] }]}>
-                      <Text style={[styles.statusBadgeText, { color: statusColors[status] }]}>
-                        {status === 'ACHIEVED' ? '✓' : '~'}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.cardStatLabel}>Delta</Text>
+                      <Text style={[styles.cardStatValue, { color: currentTrend.weightChangePct >= 0 ? colors.success : colors.danger }]}>
+                        {currentTrend.weightChangePct >= 0 ? '+' : ''}{currentTrend.weightChangePct.toFixed(1)}%
                       </Text>
                     </View>
                   </View>
-                );
-              })}
+                  <TrendDotLine data={currentTrend.dataPoints} />
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Weekly Volume */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Volume Density</Text>
+            <View style={styles.glassCard}>
+              <View style={styles.volumeHeader}>
+                <Text style={styles.cardStatLabel}>Aggregated Volume</Text>
+                <Text style={[styles.cardStatValue, { color: colors.brandPrimary }]}>
+                  {weeklyVolumeData[weeklyVolumeData.length - 1]?.value?.toLocaleString() ?? '—'} kg
+                </Text>
+              </View>
+              <MiniBarChart data={weeklyVolumeData} />
             </View>
           </View>
-        )}
 
-        {/* ── Empty state ───────────────────────────────────────────── */}
-        {trends.length === 0 && !loading && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No progress data yet</Text>
-            <Text style={styles.emptyText}>Complete your first workout to start tracking progression.</Text>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          {/* Breakdown */}
+          {breakdown && breakdown.total > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Performance Reliability</Text>
+              <View style={styles.glassCard}>
+                {[
+                  { label: 'Achieved', value: achievedPct, color: colors.success },
+                  { label: 'Progress', value: progressPct, color: colors.brandPrimary },
+                  { label: 'Under', value: failedPct, color: colors.danger },
+                ].map((item) => (
+                  <View key={item.label} style={styles.breakdownRow}>
+                    <View style={{ width: 80 }}><Text style={styles.breakdownLabel}>{item.label}</Text></View>
+                    <View style={styles.barContainer}>
+                      <View style={[styles.fullBar, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                        <View style={[styles.fillBar, { width: `${item.value}%`, backgroundColor: item.color }]} />
+                      </View>
+                      <Text style={[styles.pctLabel, { color: item.color }]}>{item.value}%</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingHorizontal: 16, paddingBottom: 24 },
-  pageTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, paddingTop: 16, marginBottom: 16 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: colors.border },
-  statLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statValue: { fontSize: 20, fontWeight: '700', marginTop: 4 },
-  statSub: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 10 },
-  card: { backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 14, overflow: 'hidden' },
-  exerciseSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  exercisePill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  exercisePillActive: { borderColor: `${colors.accent}40`, backgroundColor: `${colors.accent}10` },
-  exercisePillText: { fontSize: 12, fontWeight: '500', color: colors.textMuted },
-  exercisePillTextActive: { color: colors.accent },
-  progressionCard: { backgroundColor: colors.surfaceElevated, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 14 },
-  progressionStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  progressWeight: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
-  volumeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  breakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, width: 100 },
-  breakdownDot: { width: 8, height: 8, borderRadius: 4 },
-  breakdownLabel: { fontSize: 13, color: colors.textMuted },
-  breakdownRight: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
-  breakdownBar: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
-  breakdownBarFill: { height: '100%', borderRadius: 3 },
-  breakdownPct: { width: 35, fontSize: 12, fontWeight: '700', textAlign: 'right' },
-  topExRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
-  topExRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
-  topExRank: { width: 20, fontSize: 12, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
-  topExName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  topExStats: { alignItems: 'flex-end' },
-  topExChange: { fontSize: 13, fontWeight: '700' },
-  topExWeight: { fontSize: 10, color: colors.textMuted },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
-  emptyCard: { backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 24, alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
-  emptyText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  container: { flex: 1 },
+  centeredState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: 16, paddingBottom: 40 },
+  pageTitle: { fontSize: 40, fontWeight: '900', color: colors.textPrimary, marginTop: 20, marginBottom: 24, fontStyle: 'italic' },
+  italic: { fontStyle: 'italic', color: colors.textPrimary },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 30 },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  statLabel: { fontSize: 10, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+  statValue: { fontSize: 24, fontWeight: '900', color: colors.textPrimary, marginTop: 6 },
+  statSub: { fontSize: 9, color: colors.textMuted, marginTop: 4, fontWeight: '600' },
+  section: { marginBottom: 32 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, marginBottom: 16, fontStyle: 'italic', textTransform: 'uppercase' },
+  exerciseSelector: { gap: 8, marginBottom: 16, paddingRight: 20 },
+  exercisePill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  exercisePillActive: { backgroundColor: 'rgba(0, 194, 255, 0.1)', borderColor: colors.brandPrimary },
+  pillText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  pillTextActive: { color: colors.brandPrimary, fontWeight: '700' },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 20,
+  },
+  trendHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  cardStatLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
+  cardStatValue: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, marginTop: 4 },
+  volumeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  breakdownLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
+  barContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  fullBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
+  fillBar: { height: '100%', borderRadius: 4 },
+  pctLabel: { width: 40, fontSize: 14, fontWeight: '900', textAlign: 'right' },
 });

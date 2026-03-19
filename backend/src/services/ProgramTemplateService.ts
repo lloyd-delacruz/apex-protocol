@@ -1,5 +1,5 @@
 // Goal values must match what the route schema and frontend send
-export type GoalType = 'strength' | 'hypertrophy' | 'fat_loss' | 'endurance' | 'athletic' | 'general' | 'mobility';
+export type GoalType = 'strength' | 'hypertrophy' | 'fat_loss' | 'endurance' | 'athletic_performance' | 'general_fitness' | 'mobility';
 
 export interface DayTemplate {
   phase: string;
@@ -60,11 +60,11 @@ export const ProgramTemplateService = {
         const ranges = ['15-20', '15-20', '15-20'];
         return ranges[monthIndex] ?? '15-20';
       }
-      case 'athletic': {
+      case 'athletic_performance': {
         const ranges = ['8-12', '6-10', '4-8'];
         return ranges[monthIndex] ?? '6-10';
       }
-      case 'general':
+      case 'general_fitness':
       default: {
         const ranges = ['10-15', '8-12', '8-12'];
         return ranges[monthIndex] ?? '10-12';

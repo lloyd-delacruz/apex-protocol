@@ -5,7 +5,14 @@ import { signToken } from '../middleware/auth';
 
 // ─── Public shape returned to API consumers ───────────────────────────────────
 
-function safeUser(user: { id: string; email: string; firstName: string | null; lastName: string | null; createdAt: Date }) {
+function safeUser(user: {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  createdAt: Date;
+  onboardingProfile?: { completedAt: Date | null } | null;
+}) {
   return {
     id: user.id,
     email: user.email,
@@ -13,6 +20,7 @@ function safeUser(user: { id: string; email: string; firstName: string | null; l
     firstName: user.firstName,
     lastName: user.lastName,
     createdAt: user.createdAt.toISOString(),
+    onboardingComplete: !!user.onboardingProfile?.completedAt,
   };
 }
 

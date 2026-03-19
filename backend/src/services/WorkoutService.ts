@@ -1,4 +1,5 @@
 import prisma from '../db/prisma';
+import { ProgressionService } from './ProgressionService';
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,9 @@ export const WorkoutService = {
     const assignment = await prisma.userProgramAssignment.findFirst({
       where: { userId, isActive: true },
       include: {
+        user: {
+          include: { onboardingProfile: true },
+        },
         program: {
           include: {
             programMonths: {
@@ -45,6 +49,9 @@ export const WorkoutService = {
       return null;
     }
 
+    const { onboardingProfile } = assignment.user;
+    const bestLifts = (onboardingProfile?.bestLifts as any[]) || [];
+
     const startDate = assignment.startDate ?? assignment.assignedAt;
     const startDay = new Date(startDate);
     startDay.setHours(0, 0, 0, 0);
@@ -74,6 +81,21 @@ export const WorkoutService = {
 
     // Find workout day for this day of week (sortOrder is 1-indexed)
     const workoutDay = currentWeek.workoutDays.find((d) => d.sortOrder === dayOfWeek + 1) ?? null;
+
+    // Enhance prescriptions with suggested weights
+    if (workoutDay) {
+      const enrichedPrescriptions = await Promise.all(
+        workoutDay.exercisePrescriptions.map(async (p) => {
+          const suggestion = await this.calculateSuggestedWeight(userId, p.exerciseId, p.targetRepRange || '10', bestLifts);
+          return {
+            ...p,
+            suggestedWeight: suggestion.weight,
+            weightUnit: suggestion.unit,
+          };
+        }),
+      );
+      (workoutDay as any).exercisePrescriptions = enrichedPrescriptions;
+    }
 
     return {
       assignment: {
@@ -129,5 +151,52 @@ export const WorkoutService = {
     }
 
     return workoutDay;
+  },
+
+  /**
+   * Internal helper to calculate the suggested weight for an exercise.
+   * Priority: 1. Confirmed History, 2. Calibration (Best Lifts), 3. Default (0)
+   */
+  async calculateSuggestedWeight(userId: string, exerciseId: string, targetRepsText: string, bestLifts: any[]) {
+    // 1. Check confirmed history via ProgressionService
+    const confirmed = await ProgressionService.getSuggestedWeight(userId, exerciseId);
+    if (confirmed && confirmed.suggestedWeight > 0) {
+      return { weight: confirmed.suggestedWeight, unit: confirmed.weightUnit };
+    }
+
+    // 2. Check Calibration (Best Lifts)
+    if (bestLifts.length > 0) {
+      const exercise = await prisma.exercise.findUnique({ where: { id: exerciseId } });
+      if (exercise) {
+        // Find a matching best lift
+        const match = bestLifts.find(
+          (bl) =>
+            bl.exerciseName.toLowerCase() === exercise.name.toLowerCase() ||
+            (exercise.name.toLowerCase().includes('squat') && bl.exerciseName.toLowerCase().includes('squat')) ||
+            (exercise.name.toLowerCase().includes('bench') && bl.exerciseName.toLowerCase().includes('bench press')) ||
+            (exercise.name.toLowerCase().includes('deadlift') && bl.exerciseName.toLowerCase().includes('deadlift')) ||
+            (exercise.name.toLowerCase().includes('press') && bl.exerciseName.toLowerCase().includes('press')),
+        );
+
+        if (match && match.weight > 0) {
+          // Epley 1RM Est: 1RM = weight * (1 + reps/30)
+          const est1RM = Number(match.weight) * (1 + Number(match.reps) / 30);
+          
+          // Parse target reps (e.g. "8-12" -> 10)
+          const targetRepsMatch = targetRepsText.match(/(\d+)/);
+          const targetReps = targetRepsMatch ? parseInt(targetRepsMatch[1], 10) : 10;
+
+          // % of 1RM based on reps (approximate for calibration)
+          // 1 rep = 100%, 5 reps = 87%, 10 reps = 75%, 15 reps = 65%
+          const pct = Math.max(0.4, 1 - (targetReps * 0.025)); // Simple linear approximation
+          const suggested = Math.round(est1RM * pct * 2) / 2; // Round to 0.5
+
+          return { weight: suggested, unit: match.unit || 'kg' };
+        }
+      }
+    }
+
+    // 3. Fallback
+    return { weight: 0, unit: 'kg' };
   },
 };

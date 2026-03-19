@@ -516,19 +516,15 @@ Every service must include:
 
 ## Ports
 
-| Service | URL |
-|---------|-----|
-| Application (Web + API) | http://localhost:4000 |
+| Service | Local Port | URL |
+|---------|------------|-----|
+| Web Client | 4000 | `http://localhost:4000` |
+| Mobile API | 4001 | `http://localhost:4001` (or LAN IP) |
+| Backend API | 4001 | `http://localhost:4001` |
 
-The web client runs on `http://localhost:4000` and automatically proxies `/api` requests to the backend (which runs internally on a hidden port like 4001). All local access (web browsing and API calls) MUST use `http://localhost:4000`.
-
-The web client defaults the API base URL to `http://localhost:4000` via:
-
-```
-NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
-```
-
-Never change this default port for local development. Do not make use of other localhost ports except for 4000 natively.
+- **Web Client (4000)**: Serves the Next.js frontend and proxies `/api/*` requests to port 4001 internally.
+- **Mobile Client**: Connects directly to the Backend API on port 4001. If testing on a physical device via Expo Go, you MUST use your machine's LAN IP (e.g. `http://192.168.1.XX:4001`) instead of `localhost`.
+- **Backend (4001)**: The source of truth for all API requests.
 
 ---
 

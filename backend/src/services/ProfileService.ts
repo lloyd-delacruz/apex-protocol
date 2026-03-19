@@ -22,17 +22,50 @@ export const ProfileService = {
    * This is called during and after the onboarding flow.
    */
   async upsertOnboardingProfile(userId: string, data: any) {
-    const { equipment, ...profileData } = data;
+    const { equipment, bodyStats, ...profileData } = data;
     
     return prisma.$transaction(async (tx) => {
       // 1. Upsert the base onboarding record
       const profile = await tx.onboardingProfile.upsert({
         where: { userId },
-        create: { ...profileData, userId },
-        update: profileData,
+        create: { 
+          ...profileData, 
+          userId,
+          bodyStatsSnapshot: bodyStats || undefined
+        },
+        update: {
+          ...profileData,
+          bodyStatsSnapshot: bodyStats || undefined
+        },
       });
 
-      // 2. Handle Equipment Profile if provided
+      // 2. Sync to UserProfile if bodyStats provided
+      if (bodyStats) {
+        const healthData: any = {};
+        if (bodyStats.gender) healthData.gender = bodyStats.gender;
+        if (bodyStats.weight) healthData.weightValue = bodyStats.weight;
+        if (bodyStats.height) healthData.heightValue = bodyStats.height;
+        if (bodyStats.unit) {
+          healthData.weightUnit = bodyStats.unit;
+          healthData.heightUnit = bodyStats.unit === 'lbs' ? 'in' : 'cm';
+        }
+        if (bodyStats.dob) {
+          const parsedDate = new Date(bodyStats.dob);
+          if (!isNaN(parsedDate.getTime())) {
+            healthData.dateOfBirth = parsedDate;
+          }
+        }
+
+        if (Object.keys(healthData).length > 0) {
+          await tx.userProfile.upsert({
+            where: { userId },
+            create: { ...healthData, userId },
+            update: healthData,
+          });
+        }
+      }
+
+      // 3. Handle Equipment Profile if provided
       if (equipment && Array.isArray(equipment)) {
         // Find existing default or create new
         let eqProfile = await tx.equipmentProfile.findFirst({

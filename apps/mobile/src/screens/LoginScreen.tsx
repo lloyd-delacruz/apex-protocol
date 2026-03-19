@@ -142,8 +142,8 @@ export default function LoginScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Email</Text>
               <TextInput
+                ref={emailRef}
                 {...inputProps({
-                  ref: emailRef,
                   value: email,
                   onChangeText: setEmail,
                   placeholder: 'you@example.com',
@@ -159,8 +159,8 @@ export default function LoginScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Password</Text>
               <TextInput
+                ref={passwordRef}
                 {...inputProps({
-                  ref: passwordRef,
                   value: password,
                   onChangeText: setPassword,
                   placeholder: mode === 'register' ? 'Min. 8 characters' : '••••••••',
@@ -193,6 +193,17 @@ export default function LoginScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Dev bypass */}
+            {__DEV__ && (
+              <TouchableOpacity
+                style={styles.bypassBtn}
+                onPress={useAuth().loginDev}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.bypassBtnText}>Skip to Dashboard (Dev Mode)</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -284,4 +295,15 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { color: colors.background, fontSize: 15, fontWeight: '700' },
+  bypassBtn: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  bypassBtnText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 });

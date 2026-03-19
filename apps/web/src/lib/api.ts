@@ -10,7 +10,7 @@
  *   - On 401, the client automatically attempts one token refresh before redirecting to login
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001';
 const TOKEN_KEY = 'apex_token';
 const REFRESH_TOKEN_KEY = 'apex_refresh_token';
 const USER_KEY = 'apex_user';
@@ -130,13 +130,13 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
 export const api = {
   auth: {
     login: (email: string, password: string) =>
-      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string } }>(
+      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string; onboardingComplete?: boolean } }>(
         '/api/auth/login',
         { method: 'POST', body: JSON.stringify({ email, password }) }
       ),
 
     register: (email: string, password: string, name: string) =>
-      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string } }>(
+      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string; onboardingComplete?: boolean } }>(
         '/api/auth/register',
         { method: 'POST', body: JSON.stringify({ email, password, name }) }
       ),
@@ -148,7 +148,7 @@ export const api = {
       }),
 
     me: () =>
-      request<{ user: { id: string; email: string; name: string } }>('/api/auth/me'),
+      request<{ user: { id: string; email: string; name: string; onboardingComplete?: boolean } }>('/api/auth/me'),
 
     refresh: (refreshToken: string) =>
       request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string } }>(

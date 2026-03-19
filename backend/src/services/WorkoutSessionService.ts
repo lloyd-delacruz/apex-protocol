@@ -8,6 +8,9 @@ export interface StartSessionInput {
 export interface FinishSessionInput {
   sessionId: string;
   notes?: string;
+  syncToAppleHealth?: boolean;
+  postToStrava?: boolean;
+  postToFitbit?: boolean;
 }
 
 export interface LogSetInput {
@@ -34,8 +37,6 @@ export interface AddSessionExerciseInput {
 export const WorkoutSessionService = {
   /**
    * Start a new workout session.
-   * Creates the session record and populates workout_session_exercises
-   * from the exercise prescriptions for the given workoutDayId.
    */
   async startSession(input: StartSessionInput) {
     const session = await prisma.workoutSession.create({
@@ -57,10 +58,10 @@ export const WorkoutSessionService = {
 
       if (prescriptions.length > 0) {
         await prisma.workoutSessionExercise.createMany({
-          data: prescriptions.map((p, idx) => ({
+          data: prescriptions.map((p: any, idx: number) => ({
             sessionId: session.id,
             exerciseId: p.exerciseId,
-            workoutExerciseId: p.id, // stores the prescription ID for mapping
+            workoutExerciseId: p.id,
             orderIndex: idx,
             wasReplaced: false,
           })),
@@ -91,7 +92,7 @@ export const WorkoutSessionService = {
   },
 
   /**
-   * Replace an exercise in a session (marks was_replaced = true, updates exerciseId).
+   * Replace an exercise in a session.
    */
   async updateSessionExercise(sessionExerciseId: string, newExerciseId: string) {
     return prisma.workoutSessionExercise.update({
@@ -100,6 +101,15 @@ export const WorkoutSessionService = {
         exerciseId: newExerciseId,
         wasReplaced: true,
       },
+    });
+  },
+
+  /**
+   * Remove an exercise from an in-progress session.
+   */
+  async removeSessionExercise(sessionExerciseId: string) {
+    return prisma.workoutSessionExercise.delete({
+      where: { id: sessionExerciseId },
     });
   },
 
@@ -127,94 +137,30 @@ export const WorkoutSessionService = {
   },
 
   /**
-   * Finish a workout session and compute summary stats.
+   * Finish a workout session.
    */
   async finishSession(input: FinishSessionInput) {
     const session = await prisma.workoutSession.findUnique({
       where: { id: input.sessionId },
-      include: { workoutDay: true },
     });
 
     if (!session) {
       throw Object.assign(new Error('Session not found'), { statusCode: 404 });
     }
 
-    if (session.status !== 'in_progress') {
-      throw Object.assign(new Error('Session is not in progress'), { statusCode: 400 });
-    }
-
     const finishedAt = new Date();
     const durationSec = Math.floor((finishedAt.getTime() - session.startedAt.getTime()) / 1000);
 
-    // Compute stats from training logs of the same day for this user
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const logs = await prisma.trainingLog.findMany({
-      where: {
-        userId: session.userId,
-        workoutDayId: session.workoutDayId,
-        sessionDate: { gte: today },
-      },
-    });
-
-    let totalVolume = 0;
-    const completedExercises = new Set<string>();
-
-    logs.forEach((log) => {
-      const weight = Number(log.weight || 0);
-      const reps = (log.set1Reps || 0) + (log.set2Reps || 0) + (log.set3Reps || 0) + (log.set4Reps || 0);
-      totalVolume += weight * reps;
-      completedExercises.add(log.exerciseId);
-    });
-
-    // Simple calorie estimate: 5 kcal per minute for weight training
-    const estimatedCalories = Math.floor((durationSec / 60) * 5);
-
-    const updatedSession = await prisma.workoutSession.update({
+    return prisma.workoutSession.update({
       where: { id: session.id },
       data: {
         status: 'completed',
         finishedAt,
         durationSec,
-        totalVolume,
-        estimatedCalories,
-        completedExerciseCount: completedExercises.size,
         notes: input.notes,
-      },
-    });
-
-    await this.updateWeeklyProgress(session.userId);
-
-    return updatedSession;
-  },
-
-  /**
-   * Update or create the weekly progress record for the user.
-   */
-  async updateWeeklyProgress(userId: string) {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const weekStart = new Date(now.setDate(diff));
-    weekStart.setHours(0, 0, 0, 0);
-
-    const workoutsThisWeek = await prisma.workoutSession.count({
-      where: {
-        userId,
-        status: 'completed',
-        finishedAt: { gte: weekStart },
-      },
-    });
-
-    return prisma.weeklyProgress.upsert({
-      where: { userId_weekStartDate: { userId, weekStartDate: weekStart } },
-      update: { workoutsCompleted: workoutsThisWeek },
-      create: {
-        userId,
-        weekStartDate: weekStart,
-        workoutsCompleted: workoutsThisWeek,
-        weeklyGoal: 3,
+        syncToAppleHealth: input.syncToAppleHealth ?? false,
+        postToStrava: input.postToStrava ?? false,
+        postToFitbit: input.postToFitbit ?? false,
       },
     });
   },

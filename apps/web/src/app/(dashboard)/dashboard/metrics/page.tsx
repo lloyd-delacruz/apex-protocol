@@ -218,11 +218,11 @@ export default function MetricsPage() {
                 <Area
                   type="monotone"
                   dataKey="weight"
-                  stroke="#00C2FF"
-                  strokeWidth={2.5}
-                  fill="url(#weightGradient)"
-                  dot={{ fill: '#00C2FF', strokeWidth: 0, r: 3 }}
-                  activeDot={{ r: 5, fill: '#00C2FF', stroke: '#0A0A0F', strokeWidth: 2 }}
+                   stroke="#00C2FF"
+                   strokeWidth={2.5}
+                   fill="url(#weightGradient)"
+                   dot={{ fill: "#00C2FF", strokeWidth: 0, r: 3 }}
+                   activeDot={{ r: 5, fill: "#00C2FF", stroke: "#0A0A0F", strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>

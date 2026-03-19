@@ -16,14 +16,14 @@ export const UserRepository = {
   async findByEmail(email: string) {
     return prisma.user.findFirst({
       where: { email: email.toLowerCase(), deletedAt: null },
-      include: { role: true },
+      include: { role: true, onboardingProfile: true },
     });
   },
 
   async findById(id: string) {
     return prisma.user.findFirst({
       where: { id, deletedAt: null },
-      include: { role: true },
+      include: { role: true, onboardingProfile: true },
     });
   },
 
@@ -36,7 +36,7 @@ export const UserRepository = {
         lastName: data.lastName,
         roleId: data.roleId,
       },
-      include: { role: true },
+      include: { role: true, onboardingProfile: true },
     });
   },
 

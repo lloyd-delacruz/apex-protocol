@@ -17,7 +17,7 @@ const updatePrescriptionSchema = z.object({
   exerciseId: z.string().uuid('exerciseId must be a valid UUID'),
 });
 
-const GOAL_VALUES = ['strength', 'hypertrophy', 'fat_loss', 'endurance', 'athletic', 'general', 'mobility'] as const;
+const GOAL_VALUES = ['strength', 'hypertrophy', 'fat_loss', 'endurance', 'athletic_performance', 'general_fitness', 'mobility'] as const;
 
 const generateSchema = z.object({
   // Accept one or more goals — minimum 1, maximum 3

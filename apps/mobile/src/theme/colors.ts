@@ -8,6 +8,8 @@ export const colors = {
   surfaceElevated: '#1A1A26',
   accent: '#00C2FF',
   accentSecondary: '#7B61FF',
+  brandPrimary: '#00C2FF', // Premium Sapphire/Electric Blue
+  brandSecondary: '#0066FF',
   textPrimary: '#F0F0F5',
   textMuted: '#6B7280',
   success: '#10B981',

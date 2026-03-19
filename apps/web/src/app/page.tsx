@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import api, { saveAuth } from '@/lib/api';
 
-// DEV BYPASS: Set to true to skip authentication during testing
-const DEV_BYPASS = true;
 
 export default function LandingPage() {
   const router = useRouter();
@@ -18,28 +16,26 @@ export default function LandingPage() {
 
   // On mount: if already authenticated, route to the correct screen
   useEffect(() => {
-    // DEV BYPASS: skip auth and go directly to onboarding
-    if (DEV_BYPASS) {
-      const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
-      if (!localStorage.getItem('apex_token')) {
-        saveAuth('dev_bypass_token', { id: 'dev', email: 'dev@test.com', name: 'Dev User' });
+    const token = localStorage.getItem('apex_token');
+    if (!token) return;
+
+    // Verify session is still valid and sync onboarding state from server
+    api.auth.me().then((result) => {
+      const u = result.user as { onboardingComplete?: boolean };
+      if (u.onboardingComplete) {
+        localStorage.setItem('apex_onboarding_complete', 'true');
       }
+      const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
       if (onboardingComplete === 'true') {
         router.replace('/dashboard');
       } else {
         router.replace('/onboarding');
       }
-      return;
-    }
-
-    const token = localStorage.getItem('apex_token');
-    if (!token) return;
-    const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
-    if (onboardingComplete === 'true') {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/onboarding');
-    }
+    }).catch(() => {
+      // Token expired or invalid — stay on login page
+      localStorage.removeItem('apex_token');
+      localStorage.removeItem('apex_refresh_token');
+    });
   }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,6 +57,12 @@ export default function LandingPage() {
       }
 
       saveAuth(result.token, result.user, result.refreshToken);
+
+      // Sync onboarding state from server — the user object is the source of truth
+      const u = result.user as { onboardingComplete?: boolean };
+      if (u.onboardingComplete) {
+        localStorage.setItem('apex_onboarding_complete', 'true');
+      }
 
       const onboardingComplete = localStorage.getItem('apex_onboarding_complete');
       if (onboardingComplete === 'true') {
@@ -90,7 +92,7 @@ export default function LandingPage() {
         />
         <div
           className="absolute bottom-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(0,194,255,0.3), transparent)' }}
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(0, 194, 255, 0.3), transparent)' }}
         />
 
         {/* Logo */}

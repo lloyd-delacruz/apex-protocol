@@ -2,42 +2,20 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import HomeScreen from '../screens/HomeScreen';
 import WorkoutScreen from '../screens/WorkoutScreen';
 import ProgressScreen from '../screens/ProgressScreen';
 import LoginScreen from '../screens/LoginScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 
 // ─── Navigators ───────────────────────────────────────────────────────────────
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// ─── Tab icons ────────────────────────────────────────────────────────────────
-
-const HomeIcon = ({ focused, color }: { focused: boolean; color: string }) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-    <View style={styles.svgPlaceholder}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <View style={[styles.dot, { backgroundColor: color }]} />
-    </View>
-  </View>
-);
-
-const BoltIcon = ({ focused, color }: { focused: boolean; color: string }) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-    <Text style={{ color, fontSize: 18 }}>⚡</Text>
-  </View>
-);
-
-const ChartIcon = ({ focused, color }: { focused: boolean; color: string }) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-    <Text style={{ color, fontSize: 18 }}>📊</Text>
-  </View>
-);
 
 // ─── Main tab navigator ───────────────────────────────────────────────────────
 
@@ -67,21 +45,21 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ focused, color }) => <HomeIcon focused={focused} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
         name="Workout"
         component={WorkoutScreen}
         options={{
-          tabBarIcon: ({ focused, color }) => <BoltIcon focused={focused} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
         name="Progress"
         component={ProgressScreen}
         options={{
-          tabBarIcon: ({ focused, color }) => <ChartIcon focused={focused} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart-outline" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
@@ -90,8 +68,20 @@ function MainTabs() {
 
 // ─── Root navigator ───────────────────────────────────────────────────────────
 
+// ─── Dev Mode ─────────────────────────────────────────────────────────────────
+// Set to true to bypass login & onboarding during development
+const DEV_MODE = false;
+
 export default function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, onboardingComplete, loginDev, setOnboardingComplete } = useAuth();
+
+  // Auto-login in dev mode
+  React.useEffect(() => {
+    if (DEV_MODE && !loading && !user) {
+      loginDev();
+      setOnboardingComplete(true);
+    }
+  }, [DEV_MODE, loading, user]);
 
   // Show a splash/loading screen while restoring session
   if (loading) {
@@ -114,35 +104,22 @@ export default function AppNavigator() {
     );
   }
 
-  // Authenticated — show main app
+  // Onboarding not complete — show onboarding
+  if (!onboardingComplete) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  // Authenticated & Onboarding complete — show main app
   return <MainTabs />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 36,
-    height: 28,
-    borderRadius: 8,
-  },
-  iconContainerActive: {
-    backgroundColor: 'rgba(0, 194, 255, 0.08)',
-  },
-  svgPlaceholder: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 14,
-    height: 14,
-    gap: 2,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 1,
-  },
   loadingScreen: {
     flex: 1,
     backgroundColor: colors.background,

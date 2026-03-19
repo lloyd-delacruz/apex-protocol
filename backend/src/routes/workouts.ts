@@ -66,6 +66,9 @@ router.post(
       const session = await WorkoutSessionService.finishSession({
         sessionId: req.body.sessionId,
         notes: req.body.notes,
+        syncToAppleHealth: req.body.syncToAppleHealth,
+        postToStrava: req.body.postToStrava,
+        postToFitbit: req.body.postToFitbit,
       });
       res.json({ success: true, data: session, error: null });
     } catch (err: unknown) {
@@ -162,6 +165,22 @@ router.post(
         restAfterSec,
       });
       res.status(201).json({ success: true, data: loggedSet, error: null });
+    } catch (err: unknown) {
+      handleError(err, res);
+    }
+  }
+);
+
+// DELETE /api/workouts/session/exercises/:sessionExerciseId — remove exercise from session
+router.delete(
+  '/session/exercises/:sessionExerciseId',
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const { sessionExerciseId } = req.params;
+
+    try {
+      await WorkoutSessionService.removeSessionExercise(sessionExerciseId);
+      res.json({ success: true, data: null, error: null });
     } catch (err: unknown) {
       handleError(err, res);
     }
