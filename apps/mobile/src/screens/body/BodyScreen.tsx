@@ -1,4 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BodyStackParamList } from '../../navigation/types';
 import {
   View,
   Text,
@@ -20,6 +23,7 @@ import { colors } from '../../theme/colors';
 import { api } from '../../services/api';
 import type { MetricEntry } from '../../types/api';
 import { useLatestMetrics, useMetricsHistory } from '../../hooks/useMetrics';
+import ScreenErrorState from '../../components/ScreenErrorState';
 
 interface LogForm {
   body_weight: string;
@@ -46,9 +50,11 @@ const DEFAULT_FORM: LogForm = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BodyScreen() {
-  const { metrics: latest, loading: loadingLatest, refresh: refreshLatest } = useLatestMetrics();
-  const { entries: metrics, loading: loadingHistory, refresh: refreshHistory } = useMetricsHistory(14);
+  const navigation = useNavigation<NativeStackNavigationProp<BodyStackParamList>>();
+  const { metrics: latest, loading: loadingLatest, error: errorLatest, refresh: refreshLatest } = useLatestMetrics();
+  const { entries: metrics, loading: loadingHistory, error: errorHistory, refresh: refreshHistory } = useMetricsHistory(14);
   const loading = loadingLatest || loadingHistory;
+  const error = errorLatest ?? errorHistory ?? null;
   const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,6 +146,15 @@ export default function BodyScreen() {
     );
   }
 
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+        <ScreenErrorState message={error} onRetry={async () => { await Promise.all([refreshLatest(), refreshHistory()]); }} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
@@ -148,10 +163,16 @@ export default function BodyScreen() {
         {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Body</Text>
-          <TouchableOpacity style={styles.logBtn} onPress={openLog} activeOpacity={0.85}>
-            <Ionicons name="add" size={18} color={colors.background} />
-            <Text style={styles.logBtnText}>Log Today</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.targetsBtn} onPress={() => navigation.navigate('Targets')} activeOpacity={0.8}>
+              <Ionicons name="flag-outline" size={16} color={colors.brandPrimary} />
+              <Text style={styles.targetsBtnText}>Targets</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logBtn} onPress={openLog} activeOpacity={0.85}>
+              <Ionicons name="add" size={18} color={colors.background} />
+              <Text style={styles.logBtnText}>Log Today</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -446,6 +467,22 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: colors.textPrimary,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  targetsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.brandPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 22,
+  },
+  targetsBtnText: { fontSize: 13, fontWeight: '700', color: colors.brandPrimary },
   logBtn: {
     flexDirection: 'row',
     alignItems: 'center',

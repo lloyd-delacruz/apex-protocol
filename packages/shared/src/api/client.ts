@@ -5,6 +5,8 @@
  * Lightweight fetch-based wrapper — no external dependencies required.
  */
 
+import { TrainingStatus } from '../types';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
@@ -42,24 +44,34 @@ export function createApiClient(options: ApiClientOptions) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
     try {
       const res = await fetch(`${baseUrl}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (res.status === 401 || res.status === 403) {
         onUnauthorized?.();
+        return { success: false, data: null, error: 'Session expired. Please sign in again.' };
       }
 
       const json = (await res.json()) as ApiResponse<T>;
       return json;
     } catch (err: any) {
-      // Network error (device offline, server unreachable, DNS failure, etc.)
-      const message =
-        err?.message === 'Network request failed'
-          ? 'Cannot connect to server. Make sure the backend is running and your device is on the same network.'
+      clearTimeout(timeoutId);
+      // AbortError = timeout; otherwise network failure
+      const isTimeout = err?.name === 'AbortError';
+      const message = isTimeout
+        ? 'Request timed out. Check your connection and try again.'
+        : err?.message === 'Network request failed'
+          ? 'Cannot reach the server. Check your internet connection.'
           : err?.message ?? 'Network request failed';
       return { success: false, data: null, error: message };
     }
@@ -174,20 +186,41 @@ export function createApiClient(options: ApiClientOptions) {
 
   // ─── Exercises ─────────────────────────────────────────────────────────────
 
+  /** Canonical exercise shape returned by all /api/exercises endpoints */
+  type ExerciseRecord = {
+    id: string;
+    name: string;
+    muscleGroup: string | null;
+    bodyPart: string | null;
+    equipment: string | null;
+    category: string | null;
+    movementPattern: string | null;
+    exerciseType: string | null;
+    primaryMuscle: string | null;
+    mediaUrl: string | null;
+    isCompound: boolean;
+    isUnilateral: boolean;
+  };
+
   const exercises = {
-    list: (params?: any) => {
-      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-      return request<{ exercises: any[]; total: number }>('GET', `/api/exercises${qs}`);
+    list: (params?: Record<string, string | number | boolean | undefined>) => {
+      const filtered = params
+        ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))
+        : undefined;
+      const qs = filtered && Object.keys(filtered).length > 0
+        ? '?' + new URLSearchParams(filtered).toString()
+        : '';
+      return request<{ exercises: ExerciseRecord[]; total: number }>('GET', `/api/exercises${qs}`);
     },
 
     search: (q: string) =>
-      request<{ exercises: any[] }>('GET', `/api/exercises/search?q=${encodeURIComponent(q)}`),
+      request<{ exercises: ExerciseRecord[] }>('GET', `/api/exercises/search?q=${encodeURIComponent(q)}`),
 
     get: (id: string) =>
-      request<{ exercise: any }>('GET', `/api/exercises/${id}`),
+      request<{ exercise: ExerciseRecord }>('GET', `/api/exercises/${id}`),
 
     getSubstitutions: (id: string) =>
-      request<{ substitutions: any[] }>('GET', `/api/exercises/${id}/substitutions`),
+      request<{ substitutions: Array<{ id: string; priorityRank: number; notes: string | null; substituteExercise: ExerciseRecord }> }>('GET', `/api/exercises/${id}/substitutions`),
   };
 
   // ─── Training Log ──────────────────────────────────────────────────────────
@@ -263,7 +296,7 @@ export function createApiClient(options: ApiClientOptions) {
         weeklyVolume: Array<{ week: string; volume: number }>;
         strengthTrends: Array<{
           exercise: string;
-          dataPoints: Array<{ date: string; weight: number; status: string | null; totalReps: number | null }>;
+          dataPoints: Array<{ date: string; weight: number; status: TrainingStatus | null; totalReps: number | null }>;
           currentWeight: number;
           weightChangePct: number;
         }>;

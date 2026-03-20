@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
 import { useTrainingHistory } from '../../hooks/useWorkout';
+import ScreenErrorState from '../../components/ScreenErrorState';
 import { useProgress } from '../../hooks/useProgress';
 import { useProfile } from '../../hooks/useProfile';
 
@@ -326,7 +327,7 @@ const pwStyles = StyleSheet.create({
 
 export default function LogScreen() {
   const { user } = useAuth();
-  const { sessions, loading } = useTrainingHistory(50);
+  const { sessions, loading, error, refresh } = useTrainingHistory(50);
   const { data: analytics } = useProgress();
   const { profile } = useProfile();
   const [showTooltip, setShowTooltip] = useState(false);
@@ -466,6 +467,8 @@ export default function LogScreen() {
 
           {loading ? (
             <ActivityIndicator color={colors.brandPrimary} style={{ marginTop: 24 }} />
+          ) : error ? (
+            <ScreenErrorState message={error} onRetry={refresh} />
           ) : pastWorkouts.length === 0 ? (
             <View style={ls.emptyState}>
               <Ionicons name="barbell-outline" size={40} color={colors.textMuted} style={{ marginBottom: 12 }} />

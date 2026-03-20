@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
 } from 'react-native';
@@ -620,8 +621,9 @@ const Step14ProgramSummary = ({ onNext, onPrev }: StepProps) => {
 };
 
 const Step15Paywall = () => {
-  const { setOnboardingComplete } = useAuth();
+  const { completeOnboarding } = useOnboarding();
   const [billing, setBilling] = useState<'yearly' | 'monthly'>('yearly');
+  const [completing, setCompleting] = useState(false);
 
   return (
     <View style={styles.stepContainer}>
@@ -665,8 +667,27 @@ const Step15Paywall = () => {
 
       <View style={{ flex: 1 }} />
       <Text style={{ textAlign: 'center', color: colors.textMuted, marginBottom: 12 }}>No payment due today</Text>
-      <TouchableOpacity style={styles.brandButton} onPress={() => setOnboardingComplete(true)}>
-        <Text style={styles.brandButtonText}>START YOUR FREE TRIAL</Text>
+      <TouchableOpacity
+        style={[styles.brandButton, completing && { opacity: 0.6 }]}
+        disabled={completing}
+        onPress={async () => {
+          setCompleting(true);
+          try {
+            console.log('[Onboarding] Completing onboarding — syncing profile to backend');
+            await completeOnboarding();
+            console.log('[Onboarding] Complete — navigating to main app');
+          } catch (err: any) {
+            console.error('[Onboarding] completeOnboarding failed:', err);
+            Alert.alert('Error', err.message ?? 'Failed to complete setup. Please try again.');
+            setCompleting(false);
+          }
+        }}
+      >
+        {completing ? (
+          <ActivityIndicator size="small" color={colors.background} />
+        ) : (
+          <Text style={styles.brandButtonText}>START YOUR FREE TRIAL</Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.footerLinks}>
@@ -738,36 +759,33 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '800', color: colors.textPrimary, marginBottom: 12 },
   italic: { fontStyle: 'italic', fontWeight: '900' },
   subtitle: { fontSize: 16, color: colors.textMuted, lineHeight: 24, marginBottom: 40 },
-  stepTitle: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginBottom: 24, lineHeight: 32 },
+  stepTitle: { fontSize: 32, fontWeight: '800', fontStyle: 'italic', color: colors.textPrimary, marginBottom: 24, lineHeight: 40 },
   optionCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingVertical: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  optionCardSelected: { borderColor: colors.brandPrimary, backgroundColor: 'rgba(255, 45, 85, 0.05)' },
+  optionCardSelected: {},
   optionLabel: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  optionLabelSelected: { color: colors.textPrimary },
+  optionLabelSelected: { color: colors.brandPrimary },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioSelected: { borderColor: colors.brandPrimary },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.brandPrimary },
+  radioSelected: { borderColor: colors.brandPrimary, backgroundColor: colors.brandPrimary },
+  radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 5,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
@@ -873,15 +891,12 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textTransform: 'capitalize' },
   // New Styles
   referralOption: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    padding: 18,
-    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   summaryItemCard: {
     backgroundColor: 'rgba(255,255,255,0.03)',

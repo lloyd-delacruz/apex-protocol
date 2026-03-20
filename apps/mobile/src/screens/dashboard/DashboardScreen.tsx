@@ -19,6 +19,7 @@ import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTodayWorkout, useTrainingHistory } from '../../hooks/useWorkout';
 import { useProgress } from '../../hooks/useProgress';
+import { useProfile } from '../../hooks/useProfile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export default function HomeScreen() {
   const { data: todayWorkout, loading: loadingWorkout, error: workoutError, refresh: refreshWorkout } = useTodayWorkout();
   const { data: analytics, refresh: refreshAnalytics } = useProgress();
   const { sessions: rawHistory, refresh: refreshHistory } = useTrainingHistory(3);
+  const { profile } = useProfile();
   const [refreshing, setRefreshing] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -93,9 +95,9 @@ export default function HomeScreen() {
     setGenerating(true);
     try {
       const genRes = await api.request<{ program: { id: string } }>('POST', '/api/programs/generate', {
-        goals: ['hypertrophy'],
-        experienceLevel: 'intermediate',
-        daysPerWeek: 4,
+        goals: profile?.goal ? [profile.goal] : ['hypertrophy'],
+        experienceLevel: profile?.experience ?? 'intermediate',
+        daysPerWeek: profile?.workoutsPerWeek ?? 4,
         equipment: ['Barbell', 'Dumbbells', 'Bench', 'Cables'],
       });
 

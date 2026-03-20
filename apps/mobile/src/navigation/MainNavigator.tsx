@@ -2,11 +2,13 @@
  * Main Navigator
  *
  * Bottom tab navigator for authenticated + onboarded users.
- * 4 tabs matching the reference screenshot design:
- *   Workout  →  WorkoutScreen  (barbell icon)
- *   Body     →  BodyScreen     (body/person icon)
- *   Targets  →  TargetsScreen  (target icon)
- *   Log      →  LogScreen      (calendar icon)
+ * 5 tabs: Dashboard · Workout · Progress · Body · Log
+ *
+ *   Dashboard  →  DashboardScreen   (home icon)
+ *   Workout    →  WorkoutScreen     (barbell icon)
+ *   Progress   →  ProgressScreen    (trending-up icon)
+ *   Body       →  BodyNavigator     (body icon — stack: Body + Targets)
+ *   Log        →  LogScreen         (calendar icon)
  */
 
 import React from 'react';
@@ -15,9 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { MainTabParamList } from './types';
 
+import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import WorkoutScreen from '../screens/workout/WorkoutScreen';
-import BodyScreen from '../screens/body/BodyScreen';
-import TargetsScreen from '../screens/targets/TargetsScreen';
+import ProgressScreen from '../screens/progress/ProgressScreen';
+import BodyNavigator from './BodyNavigator';
 import LogScreen from '../screens/workout/LogScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -28,10 +31,11 @@ const TAB_ICONS: Record<
   keyof MainTabParamList,
   { active: React.ComponentProps<typeof Ionicons>['name']; inactive: React.ComponentProps<typeof Ionicons>['name'] }
 > = {
-  Workout: { active: 'barbell',    inactive: 'barbell-outline' },
-  Body:    { active: 'body',       inactive: 'body-outline' },
-  Targets: { active: 'radio-button-on', inactive: 'radio-button-off-outline' },
-  Log:     { active: 'calendar',   inactive: 'calendar-outline' },
+  Dashboard: { active: 'home',        inactive: 'home-outline' },
+  Workout:   { active: 'barbell',     inactive: 'barbell-outline' },
+  Progress:  { active: 'trending-up', inactive: 'trending-up-outline' },
+  Body:      { active: 'body',        inactive: 'body-outline' },
+  Log:       { active: 'calendar',    inactive: 'calendar-outline' },
 };
 
 // ─── Navigator ────────────────────────────────────────────────────────────────
@@ -63,10 +67,15 @@ export default function MainNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Workout" component={WorkoutScreen} />
-      <Tab.Screen name="Body"    component={BodyScreen} />
-      <Tab.Screen name="Targets" component={TargetsScreen} />
-      <Tab.Screen name="Log"     component={LogScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Workout"   component={WorkoutScreen} />
+      <Tab.Screen name="Progress"  component={ProgressScreen} />
+      <Tab.Screen
+        name="Body"
+        component={BodyNavigator}
+        options={{ tabBarLabel: 'Body' }}
+      />
+      <Tab.Screen name="Log"       component={LogScreen} />
     </Tab.Navigator>
   );
 }

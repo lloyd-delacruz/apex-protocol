@@ -26,7 +26,7 @@ export function useProgress(): UseProgressReturn {
       setError(null);
       const res = await api.analytics.dashboard();
       if (res.success && res.data) {
-        setData(res.data as unknown as DashboardAnalytics);
+        setData(res.data as DashboardAnalytics);
       } else {
         setError(res.error ?? 'Failed to load analytics');
       }

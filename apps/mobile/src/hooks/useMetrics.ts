@@ -86,6 +86,7 @@ interface UseRecoveryScoreReturn {
   score: number | null;
   loading: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
 }
 
 export function useRecoveryScore(): UseRecoveryScoreReturn {
@@ -93,19 +94,24 @@ export function useRecoveryScore(): UseRecoveryScoreReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.metrics.recovery().then((res) => {
+  const fetch = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.metrics.recovery();
       if (res.success && res.data) {
         setScore(res.data.recoveryScore);
       } else {
         setError(res.error ?? 'Failed to load recovery score');
       }
+    } catch (e: any) {
+      setError(e.message ?? 'Network error');
+    } finally {
       setLoading(false);
-    }).catch((e: any) => {
-      setError(e.message);
-      setLoading(false);
-    });
+    }
   }, []);
 
-  return { score, loading, error };
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { score, loading, error, refresh: fetch };
 }

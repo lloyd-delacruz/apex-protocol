@@ -65,6 +65,7 @@ interface PersistedSession {
   workoutDayId: string;
   startTimeISO: string;
   exercises: WorkoutExercise[];
+  sessionExercises: Array<{ id: string; exerciseId: string; orderIndex: number }>;
   loggedSets: Record<string, LoggedSet[]>;
   elapsedSec: number;
 }
@@ -97,7 +98,7 @@ function mapToExercises(workout: TodayWorkout): WorkoutExercise[] {
         prescriptionId: p.id,
         name: p.exercise.name,
         muscle: p.exercise.muscleGroup,
-        sets: DEFAULT_SETS,
+        sets: p.targetSets || DEFAULT_SETS,
         repMin,
         repMax,
         rirTarget: 2,
@@ -752,6 +753,16 @@ function SetInputRow({
   const displayReps = isLogged ? loggedSet.reps : reps;
   const displayWeight = isLogged ? loggedSet.weight : weight;
 
+  const handleLog = () => {
+    if (isLogged) return;
+    onLog({
+      weight: weight.trim() || (suggestedWeight > 0 ? suggestedWeight.toString() : '0'),
+      reps: reps.trim() || repMin.toString(),
+      rir: rirTarget.toString(),
+      setType: isWarmup ? 'warmup' : 'working',
+    });
+  };
+
   return (
     <View style={[setRowStyles.row, isLogged && setRowStyles.rowLogged]}>
       {/* Set badge */}
@@ -773,6 +784,7 @@ function SetInputRow({
           keyboardType="number-pad"
           placeholder={`${repMin}`}
           placeholderTextColor="rgba(255,255,255,0.2)"
+          returnKeyType="done"
         />
       </View>
 
@@ -786,8 +798,24 @@ function SetInputRow({
           keyboardType="decimal-pad"
           placeholder="0"
           placeholderTextColor="rgba(255,255,255,0.2)"
+          returnKeyType="done"
+          onSubmitEditing={handleLog}
         />
       </View>
+
+      {/* Log / done indicator */}
+      <TouchableOpacity
+        style={setRowStyles.logCheck}
+        onPress={handleLog}
+        disabled={isLogged}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons
+          name={isLogged ? 'checkmark-circle' : 'checkmark-circle-outline'}
+          size={28}
+          color={isLogged ? colors.success : 'rgba(255,255,255,0.2)'}
+        />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -828,6 +856,11 @@ const setRowStyles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: 'rgba(255,255,255,0.04)',
     color: colors.textMuted,
+  },
+  logCheck: {
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
@@ -1183,6 +1216,7 @@ export default function WorkoutScreen() {
       workoutDayId: workout.workoutDay.id,
       startTimeISO: startTime.toISOString(),
       exercises,
+      sessionExercises: activeSession.exercises,
       loggedSets,
       elapsedSec,
     });
@@ -1219,7 +1253,12 @@ export default function WorkoutScreen() {
             setLoggedSets(saved.loggedSets);
             setElapsedSec(saved.elapsedSec);
             setStartTime(new Date(saved.startTimeISO));
-            setActiveSession({ sessionId: saved.sessionId, workoutDayId: saved.workoutDayId, exercises: [] });
+            setExercises(saved.exercises);
+            setActiveSession({
+              sessionId: saved.sessionId,
+              workoutDayId: saved.workoutDayId,
+              exercises: saved.sessionExercises ?? [],
+            });
             setScreenState('active');
           }},
         ]);
@@ -1298,16 +1337,25 @@ export default function WorkoutScreen() {
       for (const ex of exercises) {
         const sets = loggedSets[ex.id];
         if (!sets?.length) continue;
+        // Use the heaviest working-set weight for the log entry
+        const workingSets = sets.filter(s => s.setType !== 'warmup');
+        const targetSets = workingSets.length > 0 ? workingSets : sets;
+        const maxWeight = Math.max(...targetSets.map(s => parseFloat(s.weight) || 0));
+        const avgRir = targetSets.length > 0
+          ? Math.round(targetSets.reduce((acc, s) => acc + (parseInt(s.rir, 10) || 0), 0) / targetSets.length)
+          : undefined;
         const payload: any = {
           exerciseId: ex.id,
           sessionDate: new Date().toISOString().split('T')[0],
-          weight: parseFloat(sets[0].weight) || 0,
+          weight: maxWeight,
           weightUnit: ex.weightUnit ?? 'kg',
           programId: workout?.program?.id,
           workoutDayId: workout?.workoutDay?.id,
-          exercisePrescriptionId: ex.prescriptionId,
+          exercisePrescriptionId: ex.prescriptionId || undefined,
+          rir: avgRir,
         };
-        sets.forEach((s, i) => { if (i < 4) payload[`set${i+1}Reps`] = parseInt(s.reps, 10) || 0; });
+        // Only log working sets in the reps slots (up to 4)
+        targetSets.forEach((s, i) => { if (i < 4) payload[`set${i+1}Reps`] = parseInt(s.reps, 10) || 0; });
         await api.request('POST', '/api/training-log', payload);
       }
       if (activeSession) {
@@ -1320,21 +1368,27 @@ export default function WorkoutScreen() {
       }
       await clearSession();
 
-      // Fetch analytics to populate StreakScreen with real weekly progress
+      // Fetch data to populate StreakScreen with real weekly progress
       try {
-        const [analyticsRes, profileRes] = await Promise.allSettled([
-          api.analytics.dashboard(),
-          api.request<{ profile: any }>('GET', '/api/profiles/onboarding'),
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        const startDateStr = startOfWeek.toISOString().split('T')[0];
+
+        const [historyRes, profileRes] = await Promise.allSettled([
+          api.trainingLog.history({ limit: 50, start_date: startDateStr }),
+          api.request<{ workoutsPerWeek?: number }>('GET', '/api/profiles/onboarding'),
         ]);
-        if (analyticsRes.status === 'fulfilled' && analyticsRes.value.success && analyticsRes.value.data) {
-          const data = analyticsRes.value.data as { adherence?: { sessionsLast4Weeks?: number } };
-          // Approximate workouts this week from sessions in last 4 weeks / 4
-          const recentSessions = data.adherence?.sessionsLast4Weeks ?? 0;
-          setCompletedThisWeek(Math.min(recentSessions, weeklyGoal));
+
+        if (historyRes.status === 'fulfilled' && historyRes.value.success && historyRes.value.data) {
+          const logs = (historyRes.value.data as any).logs as Array<{ sessionDate: string }>;
+          const uniqueDays = new Set(logs.map(l => l.sessionDate)).size;
+          // Include the session we just finished (it may not appear yet due to timing)
+          setCompletedThisWeek(Math.max(uniqueDays, 1));
         }
         if (profileRes.status === 'fulfilled' && profileRes.value.success && profileRes.value.data) {
-          const data = profileRes.value.data as { workoutsPerWeek?: number };
-          const goal = data.workoutsPerWeek;
+          const goal = (profileRes.value.data as any).workoutsPerWeek;
           if (goal && goal > 0) setWeeklyGoal(goal);
         }
       } catch { /* analytics failure does not block the completion flow */ }
@@ -1505,18 +1559,16 @@ export default function WorkoutScreen() {
 
                   {/* Exercise row */}
                   <View style={ms.exRow}>
-                    {/* Split thumbnail */}
-                    <View style={ms.exSplitThumb}>
+                    {/* Full square thumbnail with muscle overlay */}
+                    <View style={ms.exThumb}>
                       {ex.mediaUrl ? (
-                        <Image source={{ uri: ex.mediaUrl }} style={ms.exSplitThumbLeft} resizeMode="cover" />
+                        <Image source={{ uri: ex.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                       ) : (
-                        <View style={[ms.exSplitThumbLeft, ms.exThumbPlaceholder]}>
-                          <Ionicons name="barbell-outline" size={16} color={colors.textMuted} />
-                        </View>
+                        <Ionicons name="barbell-outline" size={24} color={colors.textMuted} />
                       )}
-                      {/* Right half: muscle silhouette placeholder */}
-                      <View style={ms.exSplitThumbRight}>
-                        <Ionicons name="body-outline" size={20} color="rgba(255,255,255,0.2)" />
+                      {/* Muscle silhouette badge in corner */}
+                      <View style={ms.exThumbMuscleOverlay}>
+                        <Ionicons name="body-outline" size={14} color="rgba(255,255,255,0.5)" />
                       </View>
                     </View>
 
@@ -1710,7 +1762,7 @@ export default function WorkoutScreen() {
             <Text style={[ms.setHeaderLabel, { flex: 1 }]}>
               {setTabMode === 'warmup' ? 'Warm-up Reps' : 'Reps'}
             </Text>
-            <Text style={[ms.setHeaderLabel, { flex: 1 }]}>Weight (lb)</Text>
+            <Text style={[ms.setHeaderLabel, { flex: 1 }]}>Weight ({currentEx?.weightUnit ?? 'kg'})</Text>
           </View>
 
           {/* ── Set rows ───────────────────────────────── */}
@@ -1728,7 +1780,7 @@ export default function WorkoutScreen() {
                   rirTarget={currentEx.rirTarget}
                   suggestedWeight={currentEx.suggestedWeight}
                   loggedSet={log}
-                  onLog={() => {}}
+                  onLog={(data) => logSet(currentEx.id, num, data, currentEx.repMin, currentEx.repMax)}
                 />
               </View>
             );
@@ -1805,12 +1857,30 @@ export default function WorkoutScreen() {
         <ExercisePicker
           visible={showExercisePicker}
           onClose={() => setShowExercisePicker(false)}
-          onSelect={(ex) => {
-            setExercises(prev => [...prev, {
+          onSelect={async (ex) => {
+            const newExercise: WorkoutExercise = {
               id: ex.id, prescriptionId: '', name: ex.name,
               muscle: ex.bodyPart, sets: DEFAULT_SETS, repMin: 8, repMax: 12,
               rirTarget: 2, suggestedWeight: 0, weightUnit: 'kg', mediaUrl: ex.mediaUrl,
-            }]);
+            };
+            setExercises(prev => [...prev, newExercise]);
+            // Register the exercise with the active session so its sets are tracked on the backend
+            if (activeSession?.sessionId) {
+              try {
+                const res = await api.workouts.addSessionExercise({
+                  sessionId: activeSession.sessionId,
+                  exerciseId: ex.id,
+                  orderIndex: exercises.length,
+                });
+                if (res.success && res.data) {
+                  const sessionEx = (res.data as any).sessionExercise ?? res.data;
+                  setActiveSession(prev => prev
+                    ? { ...prev, exercises: [...prev.exercises, { id: sessionEx.id, exerciseId: ex.id, orderIndex: exercises.length }] }
+                    : prev
+                  );
+                }
+              } catch { /* non-fatal — set falls back to local-only storage */ }
+            }
           }}
         />
       </SafeAreaView>
@@ -1885,8 +1955,8 @@ const ms = StyleSheet.create({
   exListItem: { position: 'relative' },
   connectorLine: {
     position: 'absolute',
-    left: 30,
-    top: 72,
+    left: 36,
+    top: 84,
     bottom: -4,
     width: 1,
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -1900,24 +1970,23 @@ const ms = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  exSplitThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+  exThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
     overflow: 'hidden',
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  exSplitThumbLeft: { width: '50%', height: '100%' },
-  exSplitThumbRight: {
-    width: '50%',
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  exThumbPlaceholder: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  exThumbMuscleOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -52,6 +52,12 @@ export default function RootNavigator() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);
 
+  useEffect(() => {
+    if (!loading) {
+      console.log('[RootNavigator] routing — user:', user?.id ?? null, 'onboardingComplete:', onboardingComplete, '→', !user ? 'Auth' : !onboardingComplete ? 'Onboarding' : 'Main');
+    }
+  }, [loading, user, onboardingComplete]);
+
   if (loading) return <SplashScreen />;
   if (!user) return <AuthNavigator />;
   if (!onboardingComplete) return <OnboardingNavigator />;

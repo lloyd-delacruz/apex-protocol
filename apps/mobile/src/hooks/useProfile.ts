@@ -1,26 +1,24 @@
 /**
  * useProfile
  *
- * Hook for fetching the user's profile/onboarding preferences.
- * Used to read settings like workoutsPerWeek that were set during onboarding.
+ * Hook for fetching the user's onboarding profile/preferences.
+ * Exposes the full OnboardingProfile so screens can read any field
+ * set during onboarding (goal, consistency, experience, workoutsPerWeek, etc.)
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
-
-export interface UserProfile {
-  workoutsPerWeek: number;
-}
+import type { OnboardingProfile } from '../types/api';
 
 interface UseProfileReturn {
-  profile: UserProfile | null;
+  profile: OnboardingProfile | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
 }
 
 export function useProfile(): UseProfileReturn {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,9 +26,9 @@ export function useProfile(): UseProfileReturn {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.request<{ workoutsPerWeek?: number }>('GET', '/api/profiles/onboarding');
+      const res = await api.profiles.getOnboarding();
       if (res.success && res.data) {
-        setProfile({ workoutsPerWeek: res.data.workoutsPerWeek ?? 4 });
+        setProfile(res.data as OnboardingProfile);
       } else {
         setError(res.error ?? 'Failed to load profile');
       }

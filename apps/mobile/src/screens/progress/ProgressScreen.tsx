@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, statusColors, statusBackgrounds } from '../../theme/colors';
 import { TrainingStatus } from '@apex/shared';
 import { useProgress } from '../../hooks/useProgress';
+import ScreenErrorState from '../../components/ScreenErrorState';
 
 const { width } = Dimensions.get('window');
 
@@ -74,14 +75,14 @@ const trendStyles = StyleSheet.create({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ProgressScreen() {
-  const { data: analytics, loading, refresh } = useProgress();
+  const { data: analytics, loading, error, refresh } = useProgress();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
 
   // Auto-select the first exercise when analytics loads
   useEffect(() => {
-    if (analytics?.strengthTrends?.length > 0 && !selectedExercise) {
-      setSelectedExercise(analytics.strengthTrends[0].exercise);
+    if ((analytics?.strengthTrends?.length ?? 0) > 0 && !selectedExercise) {
+      setSelectedExercise(analytics!.strengthTrends[0].exercise);
     }
   }, [analytics]);
 
@@ -97,6 +98,17 @@ export default function ProgressScreen() {
         <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
         <SafeAreaView style={styles.centeredState}>
           <ActivityIndicator size="large" color={colors.brandPrimary} />
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={styles.centeredState} edges={['top']}>
+          <ScreenErrorState message={error} onRetry={refresh} />
         </SafeAreaView>
       </View>
     );

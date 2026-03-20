@@ -119,15 +119,27 @@ Never skip this process.
 
 ### Design System
 
-- use centralized design tokens (colors, spacing, typography)
-- consistent spacing system (4 / 8 / 16 / 24 / 32)
-- no random inline styles
+Use centralized design tokens. Current brand values:
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| Background dark | `#0A0A0F` | Screen backgrounds |
+| Background mid | `#1A1A26` | Card backgrounds |
+| Primary (cyan) | `#00C2FF` | CTAs, highlights |
+| Text primary | `#FFFFFF` | Headings |
+| Text secondary | `#A0A0B0` | Labels, captions |
+| Spacing unit | 8px | Base; use multiples: 4/8/16/24/32 |
+
+- Use gradient backgrounds: `#0A0A0F` → `#1A1A26`
+- Bold italics for hero/emphasis text
+- No random inline styles — always reference design tokens
 
 ### Component Rules
 
 - reusable components only
 - no duplicated UI logic
 - separate UI from logic
+- use `ScreenErrorState` for full-screen error handling (already exists at `apps/mobile/src/components/ScreenErrorState.tsx`)
 
 ### Performance Rules
 
@@ -139,23 +151,76 @@ Never skip this process.
 
 ## 7. Navigation Rules
 
-Use: **Expo Router** or **React Navigation**
+Use: **React Navigation**
 
-Structure:
+`AppNavigator.tsx` has been removed. Navigation is now split across:
+
+- `MainNavigator.tsx` — root navigator, handles Auth/Onboarding/Main switching
+- `BodyNavigator.tsx` — nested stack inside the Body tab
+
+### Current Navigation Structure
 
 ```
-Auth Flow (Login / Register)
-Main App (Tabs)
-  ├── Dashboard
-  ├── Workouts
-  ├── Progress
-  └── Profile
-Deep Screens (Stack)
+Root (MainNavigator)
+├── Auth Stack (unauthenticated)
+│   └── Login
+├── Onboarding Stack (authenticated, not onboarded)
+│   └── Onboarding (15 steps)
+└── Main Tab Navigator (authenticated + onboarded)
+    ├── Dashboard (icon: home)
+    ├── Workout   (icon: barbell)
+    ├── Progress  (icon: trending-up)
+    ├── Body      (icon: body) → BodyNavigator (nested stack)
+    │   ├── BodyScreen
+    │   └── TargetsScreen
+    └── Log       (icon: calendar)
 ```
+
+All navigation types are defined in `apps/mobile/src/navigation/types.ts`.
 
 ---
 
-## 8. Backend Development Rules
+## 8. Data Hooks Pattern
+
+All data-fetching hooks must follow this pattern:
+
+```typescript
+function useXxx(): { data: T | null; loading: boolean; error: string | null; refresh: () => void }
+```
+
+Existing hooks (do not duplicate):
+
+| Hook | File | Purpose |
+|------|------|---------|
+| `useMetrics` | `hooks/useMetrics.ts` | Body metrics (weight, calories, sleep, mood) |
+| `useProfile` | `hooks/useProfile.ts` | Onboarding profile data |
+| `useProgress` | `hooks/useProgress.ts` | Dashboard analytics (strength, volume, adherence) |
+| `useProgression` | `hooks/useProgression.ts` | Weight progression prompts with optimistic updates |
+
+`useProgression` uses optimistic updates with ref-based rollback — follow this same pattern for any new mutation hooks.
+
+---
+
+## 9. Auth Context
+
+Global auth state is managed in `apps/mobile/src/context/AuthContext.tsx`.
+
+```typescript
+AuthUser: {
+  id, email, name, firstName, lastName,
+  onboardingComplete, subscriptionActive
+}
+```
+
+Key methods: `login()`, `register()`, `logout()`, `loginDev()` (dev only).
+
+- Session is auto-restored on app launch via `api.auth.me()`
+- 401/403 responses trigger a global unauthorized handler that clears tokens and alerts the user
+- Always use `AuthContext` — never manage tokens manually in screens
+
+---
+
+## 10. Backend Development Rules
 
 Backend is the **single source of truth**.
 
@@ -173,18 +238,39 @@ backend/
 
 ---
 
-## 9. API Design Standards
+## 11. API Design Standards
 
 RESTful APIs only.
 
-```
-GET  /api/programs
-GET  /api/workouts
-POST /api/training-log
-POST /api/body-metrics
-```
+### Current Registered Endpoints
 
-Response format:
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/auth/register` | Create account |
+| POST | `/auth/login` | Login |
+| POST | `/auth/refresh` | Refresh JWT |
+| POST | `/auth/logout` | Logout |
+| GET | `/auth/me` | Get current user |
+| GET | `/api/programs` | List programs |
+| GET | `/api/programs/assigned` | Get assigned program |
+| POST | `/api/programs/generate` | Generate program from profile |
+| POST | `/api/programs/assign` | Assign a program to user |
+| GET | `/api/workouts/today` | Get today's workout |
+| GET | `/api/profiles/onboarding` | Get onboarding profile |
+| POST | `/api/profiles/onboarding` | Save onboarding profile |
+| POST | `/api/profiles/user` | Save user profile fields |
+| GET | `/api/metrics/latest` | Latest body metrics |
+| GET | `/api/metrics/history` | Paginated metrics history |
+| GET | `/api/metrics/recovery` | Recovery score |
+| GET | `/api/analytics/dashboard` | Dashboard analytics |
+| GET | `/api/progression/pending` | Pending progression prompts |
+| POST | `/api/progression/confirm` | Confirm weight increase |
+| POST | `/api/progression/dismiss` | Dismiss progression prompt |
+| POST | `/api/training-log` | Log an exercise session |
+| GET | `/api/training-log/history` | Paginated training history |
+| GET | `/api/training-log/exercise/:exerciseId` | Exercise progression history |
+
+### Response Format
 
 ```json
 {
@@ -196,26 +282,35 @@ Response format:
 
 ---
 
-## 10. Authentication Rules
+## 12. API Client
+
+The API client is a factory defined in `packages/shared/src/api/client.ts` and instantiated in `apps/mobile/src/lib/api.ts`.
+
+Mobile-specific behavior:
+- Auto-resolves base URL from Expo debugger host (for physical devices on LAN)
+- Fallback: `http://localhost:4001` (simulators only)
+- Tokens stored in `AsyncStorage`
+- 15-second request timeout
+- Network errors returned as user-friendly messages
+
+Do NOT use raw `fetch()` in screens or hooks. Always use the centralized `api` client.
+
+---
+
+## 13. Authentication Rules
 
 Use: **JWT (access + refresh tokens)**
-
-```
-POST /auth/register
-POST /auth/login
-POST /auth/refresh
-POST /auth/logout
-```
 
 Security:
 
 - passwords must be hashed (bcrypt)
 - never store plaintext passwords
 - always validate tokens
+- never manage tokens outside of `AuthContext` + `api` client
 
 ---
 
-## 11. Database Rules
+## 14. Database Rules
 
 - **Database:** PostgreSQL
 - **ORM:** Prisma
@@ -249,25 +344,71 @@ updated_at
 
 ---
 
-## 12. Workout Logic (CRITICAL)
+## 15. Workout Logic (CRITICAL)
 
-Backend must compute:
+Backend must compute all workout logic. Mobile never computes status or progression.
 
-- rep ranges
-- progression readiness
-- next weight recommendation
+### Training Log Input Schema (Zod)
+
+```typescript
+{
+  exerciseId: string,
+  sessionDate: string,       // YYYY-MM-DD
+  programId: string,
+  workoutDayId: string,
+  weight: number,
+  weightUnit: 'kg' | 'lb',
+  set1Reps: number,
+  set2Reps: number,
+  set3Reps: number,
+  set4Reps?: number,
+  rir: number,
+  notes?: string
+}
+```
 
 ### Status Logic
 
 | Status | Condition |
 |--------|-----------|
 | `ACHIEVED` | All sets hit upper rep target |
-| `PROGRESS` | Within rep range |
-| `FAILED` | Below minimum threshold |
+| `PROGRESS` | All sets hit minimum rep target |
+| `FAILED` | Any set below minimum threshold |
+
+### Progression Logic
+
+- `readyToIncrease`: true when status is ACHIEVED
+- `nextWeight`: `current weight + increment`, rounded to nearest 0.5
 
 ---
 
-## 13. Security Rules
+## 16. Onboarding Flow
+
+The onboarding screen (`OnboardingScreen.tsx`) has **15 steps** with a progress bar:
+
+| Step | Content |
+|------|---------|
+| 1 | Welcome |
+| 2 | Primary goal (strength / muscle / body comp / weight loss / fitness / performance) |
+| 3 | Consistency level |
+| 4 | Experience level (beginner → advanced) |
+| 5 | Weekly workout days (2–6) |
+| 6 | Training environment (commercial gym → bodyweight only) |
+| 7 | Equipment selection (multiselect) |
+| 8 | Calibration intro |
+| 9 | Best lifts (5-rep max for squat, bench, deadlift, OH press) |
+| 10 | Body stats (Apple Health sync or manual) |
+| 11 | Notifications opt-in |
+| 12 | Referral source |
+| 13 | Finalization (triggers server-side program generation) |
+| 14 | Program summary |
+| 15 | Paywall (7-day trial, yearly/monthly billing) |
+
+Do not add or remove steps without updating this table.
+
+---
+
+## 17. Security Rules
 
 All backend code must include:
 
@@ -285,7 +426,7 @@ Never expose:
 
 ---
 
-## 14. Performance Rules
+## 18. Performance Rules
 
 Must follow:
 
@@ -302,32 +443,34 @@ Avoid:
 
 ---
 
-## 15. Mobile ↔ Backend Communication
+## 19. Mobile ↔ Backend Communication
 
 Mobile must:
 
 - never contain business logic
 - always rely on backend calculations
-- handle loading + error states properly
+- handle loading + error states properly (use `ScreenErrorState` for full-screen errors)
 
 Use:
 
-- centralized API client
+- centralized API client (`apps/mobile/src/lib/api.ts`)
 - retry logic for failed requests
 
 ---
 
-## 16. Offline Strategy (IMPORTANT)
+## 20. Offline Strategy (IMPORTANT)
 
 Mobile app should:
 
 - cache recent workouts
-- allow temporary offline logging
+- allow temporary offline logging (AsyncStorage for active session)
 - sync when connection returns
+
+`WorkoutScreen.tsx` already persists in-progress sessions to AsyncStorage for resumability.
 
 ---
 
-## 17. Documentation Rules
+## 21. Documentation Rules
 
 Every new module must include:
 
@@ -338,7 +481,7 @@ Every new module must include:
 
 ---
 
-## 18. Local Development
+## 22. Local Development
 
 ### Ports
 
@@ -350,10 +493,11 @@ Every new module must include:
 
 - use LAN IP for real devices
 - do NOT use `localhost`
+- API base URL auto-resolved from Expo debugger host in `apps/mobile/src/lib/api.ts`
 
 ---
 
-## 19. Hard Constraints
+## 23. Hard Constraints
 
 AI must **NEVER**:
 
@@ -363,10 +507,13 @@ AI must **NEVER**:
 - duplicate components
 - ignore architecture layers
 - add unused dependencies
+- hardcode exercise/image mappings in the frontend
+- duplicate navigation files (AppNavigator is deleted — use MainNavigator)
+- manage auth tokens outside of AuthContext
 
 ---
 
-## 20. Development Philosophy
+## 24. Development Philosophy
 
 Apex Protocol is built as a **high-performance, production-grade fitness system**.
 

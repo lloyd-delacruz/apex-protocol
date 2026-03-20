@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
-  const { login, register } = useAuth();
+  const { login, register, loginDev } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -198,7 +198,7 @@ export default function LoginScreen() {
             {__DEV__ && (
               <TouchableOpacity
                 style={styles.bypassBtn}
-                onPress={useAuth().loginDev}
+                onPress={loginDev}
                 activeOpacity={0.7}
               >
                 <Text style={styles.bypassBtnText}>Skip to Dashboard (Dev Mode)</Text>

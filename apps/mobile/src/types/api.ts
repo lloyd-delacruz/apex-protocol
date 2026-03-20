@@ -128,9 +128,11 @@ export interface ExerciseItem {
   equipment: string | null;
   category: string | null;
   movementPattern: string | null;
+  exerciseType: string | null;
   primaryMuscle: string | null;
   mediaUrl: string | null;
-  isBodyweight: boolean;
+  isCompound: boolean;
+  isUnilateral: boolean;
 }
 
 // ─── Progression ──────────────────────────────────────────────────────────────

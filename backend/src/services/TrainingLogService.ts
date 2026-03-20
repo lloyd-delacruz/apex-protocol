@@ -17,6 +17,7 @@ export interface LogExerciseInput {
   set2Reps?: number;
   set3Reps?: number;
   set4Reps?: number;
+  rir?: number;
   notes?: string;
 }
 
@@ -100,6 +101,7 @@ export const TrainingLogService = {
       set2Reps: input.set2Reps,
       set3Reps: input.set3Reps,
       set4Reps: input.set4Reps,
+      rir: input.rir,
       totalReps: totalReps ?? undefined,
       lowerRep,
       upperRep,

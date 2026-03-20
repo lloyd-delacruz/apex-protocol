@@ -31,12 +31,14 @@ export type OnboardingStackNavProp =
   NativeStackNavigationProp<OnboardingStackParamList>;
 
 // ─── Main Tab Navigator ───────────────────────────────────────────────────────
-// 4 tabs matching screenshot reference: Workout · Body · Targets · Log
+// 5 tabs: Dashboard · Workout · Progress · Body · Log
+// Targets is a stack screen nested inside the Body tab (via BodyNavigator)
 
 export type MainTabParamList = {
+  Dashboard: undefined;
   Workout: undefined;
+  Progress: undefined;
   Body: undefined;
-  Targets: undefined;
   Log: undefined;
 };
 
@@ -56,8 +58,8 @@ export type ProgressStackParamList = {
 };
 
 export type BodyStackParamList = {
-  Body: undefined;
-  MetricsHistory: undefined;
+  BodyMain: undefined;
+  Targets: undefined;
 };
 
 export type TargetsStackParamList = {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, loadToken } from '../lib/api';
+import { Alert } from 'react-native';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, loadToken, setUnauthorizedHandler } from '../lib/api';
 import api from '../lib/api';
 import type { AuthUser } from '../types/api';
 
@@ -28,11 +29,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [onboardingComplete, setOnboardingCompleteState] = useState(false);
   const [subscriptionActive, setSubscriptionActiveState] = useState(false);
 
+  // Register global unauthorized handler — fires when any API call returns 401/403
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setOnboardingCompleteState(false);
+      setSubscriptionActiveState(false);
+      // Delay alert so navigation has time to redirect to login first
+      setTimeout(() => {
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please sign in again.',
+          [{ text: 'OK' }]
+        );
+      }, 300);
+    });
+  }, []);
+
   // Restore session on app start
   useEffect(() => {
     async function restore() {
       try {
         const token = await loadToken();
+        console.log('[AuthContext] restore() — token found:', !!token);
         if (token) {
           const res = await api.auth.me();
           if (res.success && res.data) {
@@ -40,10 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(u);
             setOnboardingCompleteState(!!u.onboardingComplete);
             setSubscriptionActiveState(!!u.subscriptionActive);
+            console.log('[AuthContext] restore() — session restored. user:', u.id, 'onboardingComplete:', u.onboardingComplete);
+          } else if (!res.success) {
+            // Token exists but is invalid/expired — clear it silently
+            console.warn('[AuthContext] restore() — token invalid, remaining logged out:', res.error);
           }
         }
-      } catch {
-        // Invalid or expired token — remain logged out
+      } catch (e) {
+        // Network error during restore — remain logged out, no alert needed
+        console.warn('[AuthContext] restore() — network error:', e);
       } finally {
         setLoading(false);
       }
@@ -57,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
     setOnboardingCompleteState(!!u.onboardingComplete);
     setSubscriptionActiveState(!!u.subscriptionActive);
+    console.log('[AuthContext] login() — auth state updated. user:', u.id, 'onboardingComplete:', u.onboardingComplete, '→ navigating to', u.onboardingComplete ? 'Main' : 'Onboarding');
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string) => {

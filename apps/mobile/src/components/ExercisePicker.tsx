@@ -95,9 +95,15 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
       } else if (params?.muscle) {
         endpoint = `/api/exercises?bodyPart=${encodeURIComponent(params.muscle)}`;
       } else if (params?.category === 'cardio') {
-        endpoint = `/api/exercises?category=cardio`;
+        endpoint = `/api/exercises?exerciseType=cardio`;
       } else if (params?.category === 'bodyweight') {
         endpoint = `/api/exercises?equipment=body%20weight`;
+      } else if (params?.category === 'weighted') {
+        endpoint = `/api/exercises?isCompound=true`;
+      } else if (params?.category === 'stretch') {
+        endpoint = `/api/exercises?movementPattern=mobility`;
+      } else if (params?.category === 'bw-equipment') {
+        endpoint = `/api/exercises?exerciseType=core`;
       } else {
         endpoint = `/api/exercises`;
       }

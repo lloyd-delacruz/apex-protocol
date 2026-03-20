@@ -73,6 +73,16 @@ export async function clearRefreshToken() {
   await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+// ─── Unauthorized listener ────────────────────────────────────────────────────
+
+// AuthContext registers this so it can clear React state + show an alert
+// when any API call returns 401/403 (expired or invalid token).
+let _unauthorizedCallback: (() => void) | null = null;
+
+export function setUnauthorizedHandler(cb: () => void) {
+  _unauthorizedCallback = cb;
+}
+
 // ─── API client singleton ─────────────────────────────────────────────────────
 
 export const api = createApiClient({
@@ -81,22 +91,25 @@ export const api = createApiClient({
   onUnauthorized: async () => {
     await clearToken();
     await clearRefreshToken();
-    console.warn('[API] Unauthorized — tokens cleared, user will be redirected to login');
+    _unauthorizedCallback?.();
   },
 });
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 export async function login(email: string, password: string) {
+  console.log('[Auth] login() — attempting:', email);
   const res = await api.auth.login(email, password);
 
   if (res.success && res.data) {
     const data = res.data;
     await saveToken(data.token);
     if (data.refreshToken) await saveRefreshToken(data.refreshToken);
+    console.log('[Auth] login() — success, token saved. user:', data.user?.id, 'onboardingComplete:', data.user?.onboardingComplete);
     return { token: data.token, refreshToken: data.refreshToken, user: data.user };
   }
 
+  console.warn('[Auth] login() — failed:', res.error);
   throw new Error(res.error ?? 'Login failed');
 }
 

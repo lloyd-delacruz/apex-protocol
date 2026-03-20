@@ -8,7 +8,7 @@
  * after the user achieves all top-set reps.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { progression as progressionService } from '../services/api';
 import type { PendingProgression } from '../types/api';
 
@@ -25,6 +25,8 @@ export function useProgression(): UseProgressionReturn {
   const [pending, setPending] = useState<PendingProgression[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const confirmSnapshot = useRef<PendingProgression[]>([]);
+  const dismissSnapshot = useRef<PendingProgression[]>([]);
 
   const fetch = useCallback(async () => {
     try {
@@ -46,14 +48,41 @@ export function useProgression(): UseProgressionReturn {
   useEffect(() => { fetch(); }, [fetch]);
 
   const confirm = useCallback(async (progressionId: string, confirmedWeight: number) => {
-    await progressionService.confirm({ progressionId, confirmedWeight });
-    // Remove the confirmed item from pending list immediately (optimistic update)
-    setPending((prev) => prev.filter((p) => p.id !== progressionId));
+    // Optimistic update — remove immediately so UI feels instant
+    setPending((prev) => {
+      const next = prev.filter((p) => p.id !== progressionId);
+      // Store snapshot in closure for rollback
+      confirmSnapshot.current = prev;
+      return next;
+    });
+    try {
+      const res = await progressionService.confirm({ progressionId, confirmedWeight });
+      if (!res.success) {
+        setPending(confirmSnapshot.current ?? []);
+        setError(res.error ?? 'Failed to confirm progression. Please try again.');
+      }
+    } catch (e: any) {
+      setPending(confirmSnapshot.current ?? []);
+      setError(e.message ?? 'Network error. Your progression was not saved.');
+    }
   }, []);
 
   const dismiss = useCallback(async (progressionId: string) => {
-    await progressionService.dismiss(progressionId);
-    setPending((prev) => prev.filter((p) => p.id !== progressionId));
+    setPending((prev) => {
+      const next = prev.filter((p) => p.id !== progressionId);
+      dismissSnapshot.current = prev;
+      return next;
+    });
+    try {
+      const res = await progressionService.dismiss(progressionId);
+      if (!res.success) {
+        setPending(dismissSnapshot.current ?? []);
+        setError(res.error ?? 'Failed to dismiss. Please try again.');
+      }
+    } catch (e: any) {
+      setPending(dismissSnapshot.current ?? []);
+      setError(e.message ?? 'Network error.');
+    }
   }, []);
 
   return { pending, loading, error, confirm, dismiss, refresh: fetch };

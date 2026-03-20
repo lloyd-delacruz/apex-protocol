@@ -21,6 +21,7 @@ const logSchema = z.object({
   set2Reps: z.number().int().positive().optional(),
   set3Reps: z.number().int().positive().optional(),
   set4Reps: z.number().int().positive().optional(),
+  rir: z.number().int().min(0).max(10).optional(),
   notes: z.string().max(500).optional(),
 });
 

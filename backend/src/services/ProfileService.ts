@@ -26,16 +26,21 @@ export const ProfileService = {
     
     return prisma.$transaction(async (tx) => {
       // 1. Upsert the base onboarding record
+      // completedAt marks that the user has submitted their full profile.
+      // AuthService.safeUser() reads this to compute onboardingComplete.
+      const completedAt = new Date();
       const profile = await tx.onboardingProfile.upsert({
         where: { userId },
-        create: { 
-          ...profileData, 
+        create: {
+          ...profileData,
           userId,
-          bodyStatsSnapshot: bodyStats || undefined
+          bodyStatsSnapshot: bodyStats || undefined,
+          completedAt,
         },
         update: {
           ...profileData,
-          bodyStatsSnapshot: bodyStats || undefined
+          bodyStatsSnapshot: bodyStats || undefined,
+          completedAt,
         },
       });
 
