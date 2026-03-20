@@ -1,25 +1,32 @@
 /**
  * Root Navigator
  *
- * Controls which navigator is shown based on auth + onboarding state.
+ * Single stable Stack.Navigator at the root — screens swap based on auth state.
+ * This is the React Navigation recommended auth-flow pattern.
+ * Swapping entire navigator trees (Auth↔Onboarding↔Main) breaks React
+ * Navigation's internal state machine; a stable root with conditional screens fixes it.
  *
- *   Loading         →  SplashScreen (AP badge + spinner)
- *   No user         →  AuthNavigator      (Login)
- *   Onboarding      →  OnboardingNavigator
- *   Ready           →  MainNavigator      (Tabs)
+ *   Loading         →  SplashScreen (AP badge + spinner, rendered outside the navigator)
+ *   No user         →  "Auth"        screen  → AuthNavigator
+ *   Onboarding      →  "Onboarding"  screen  → OnboardingNavigator
+ *   Ready           →  "Main"        screen  → MainNavigator (tabs)
  *
  * DEV_MODE bypasses auth and onboarding for faster iteration.
  * Toggle via src/constants/config.ts → CONFIG.DEV_MODE
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { CONFIG } from '../constants/config';
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator from './MainNavigator';
+import type { RootNavigatorParamList } from './types';
+
+const RootStack = createNativeStackNavigator<RootNavigatorParamList>();
 
 // ─── Splash screen ────────────────────────────────────────────────────────────
 
@@ -54,14 +61,28 @@ export default function RootNavigator() {
 
   useEffect(() => {
     if (!loading) {
-      console.log('[RootNavigator] routing — user:', user?.id ?? null, 'onboardingComplete:', onboardingComplete, '→', !user ? 'Auth' : !onboardingComplete ? 'Onboarding' : 'Main');
+      const dest = !user ? 'Auth' : !onboardingComplete ? 'Onboarding' : 'Main';
+      console.log('[RootNavigator] routing — user:', user?.id ?? null, 'onboardingComplete:', onboardingComplete, '→', dest);
     }
   }, [loading, user, onboardingComplete]);
 
+  // Show splash OUTSIDE the navigator so React Navigation state is not involved
   if (loading) return <SplashScreen />;
-  if (!user) return <AuthNavigator />;
-  if (!onboardingComplete) return <OnboardingNavigator />;
-  return <MainNavigator />;
+
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+      {!user ? (
+        // ── Unauthenticated ────────────────────────────────────────────────
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      ) : !onboardingComplete ? (
+        // ── Authenticated, onboarding incomplete ───────────────────────────
+        <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+      ) : (
+        // ── Authenticated + onboarded ──────────────────────────────────────
+        <RootStack.Screen name="Main" component={MainNavigator} />
+      )}
+    </RootStack.Navigator>
+  );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────

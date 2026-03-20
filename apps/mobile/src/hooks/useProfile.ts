@@ -27,8 +27,9 @@ export function useProfile(): UseProfileReturn {
       setLoading(true);
       setError(null);
       const res = await api.profiles.getOnboarding();
-      if (res.success && res.data) {
-        setProfile(res.data as OnboardingProfile);
+      if (res.success) {
+        // data can be null for a new user with no profile yet — not an error
+        setProfile(res.data as OnboardingProfile | null);
       } else {
         setError(res.error ?? 'Failed to load profile');
       }

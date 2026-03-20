@@ -119,7 +119,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const syncToBackend = useCallback(async () => {
     try {
-      await api.request('POST', '/api/profiles/onboarding', {
+      const res = await api.request('POST', '/api/profiles/onboarding', {
         goal: state.goal,
         experience: state.experience,
         consistency: state.consistency,
@@ -130,6 +130,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         bodyStats: state.bodyStats,
         referralSource: state.referralSource,
       });
+      if (!res.success) {
+        throw new Error((res as any).error ?? 'Failed to save profile to server');
+      }
     } catch (err) {
       console.error('[OnboardingContext] Sync failed:', err);
       throw err;

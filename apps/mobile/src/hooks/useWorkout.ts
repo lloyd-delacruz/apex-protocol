@@ -28,13 +28,17 @@ export function useTodayWorkout(): UseTodayWorkoutReturn {
     try {
       setLoading(true);
       setError(null);
+      console.log('[useTodayWorkout] fetching /api/workouts/today');
       const res = await api.workouts.today();
-      if (res.success && res.data) {
-        setData(res.data as TodayWorkout);
+      console.log('[useTodayWorkout] response — success:', res.success, 'hasData:', !!res.data, 'error:', res.error);
+      if (res.success) {
+        // data can be null when no program is assigned — that is valid, not an error
+        setData(res.data as TodayWorkout | null);
       } else {
         setError(res.error ?? 'Failed to load today\'s workout');
       }
     } catch (e: any) {
+      console.error('[useTodayWorkout] exception:', e?.message);
       setError(e.message ?? 'Network error');
     } finally {
       setLoading(false);
