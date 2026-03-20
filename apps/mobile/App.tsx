@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import AppNavigator from './src/navigation/AppNavigator';
+import RootNavigator from './src/navigation';
 import { AuthProvider } from './src/context/AuthContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { colors } from './src/theme/colors';
@@ -26,7 +26,7 @@ export default function App() {
             }}
           >
             <StatusBar style="light" backgroundColor={colors.background} />
-            <AppNavigator />
+            <RootNavigator />
           </NavigationContainer>
         </OnboardingProvider>
       </AuthProvider>

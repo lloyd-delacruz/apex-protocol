@@ -6,11 +6,33 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { createApiClient } from '@apex/shared';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.26.81.24:4001';
+// Resolve the dev machine's IP from Expo so physical devices can connect.
+// expoConfig.hostUri is like "192.168.1.5:8081" — we strip the Expo port
+// and replace it with the backend's port (4001).
+function getApiBaseUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  const debuggerHost =
+    Constants.expoConfig?.hostUri ??          // SDK 49+
+    (Constants as any).manifest?.debuggerHost; // older SDKs
+
+  if (debuggerHost) {
+    const host = debuggerHost.split(':')[0]; // strip Expo port
+    return `http://${host}:4001`;
+  }
+
+  // Fallback for simulators / web
+  return 'http://localhost:4001';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 const TOKEN_KEY = 'apex_token';
 const REFRESH_TOKEN_KEY = 'apex_refresh_token';
 
@@ -69,7 +91,7 @@ export async function login(email: string, password: string) {
   const res = await api.auth.login(email, password);
 
   if (res.success && res.data) {
-    const data = res.data as { token: string; refreshToken: string; user: unknown };
+    const data = res.data;
     await saveToken(data.token);
     if (data.refreshToken) await saveRefreshToken(data.refreshToken);
     return { token: data.token, refreshToken: data.refreshToken, user: data.user };
@@ -82,7 +104,7 @@ export async function register(email: string, password: string, name: string) {
   const res = await api.auth.register(email, password, name);
 
   if (res.success && res.data) {
-    const data = res.data as { token: string; refreshToken: string; user: unknown };
+    const data = res.data;
     await saveToken(data.token);
     if (data.refreshToken) await saveRefreshToken(data.refreshToken);
     return { token: data.token, refreshToken: data.refreshToken, user: data.user };

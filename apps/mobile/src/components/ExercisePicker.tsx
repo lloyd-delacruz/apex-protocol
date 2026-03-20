@@ -15,22 +15,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api from '../lib/api';
+import type { ExerciseItem } from '../types/api';
 
 const { width } = Dimensions.get('window');
-
-interface Exercise {
-  id: string;
-  name: string;
-  bodyPart: string | null;
-  muscleGroup: string | null;
-  category: string | null;
-  mediaUrl?: string | null;
-}
 
 interface ExercisePickerProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (exercise: Exercise) => void;
+  onSelect: (exercise: ExerciseItem) => void;
   title?: string;
 }
 
@@ -66,8 +58,8 @@ type TabId = 'all' | 'by-muscle' | 'categories';
 
 // ─── Group exercises alphabetically ──────────────────────────────────────────
 
-function groupAlphabetically(exercises: Exercise[]) {
-  const groups: Record<string, Exercise[]> = {};
+function groupAlphabetically(exercises: ExerciseItem[]) {
+  const groups: Record<string, ExerciseItem[]> = {};
   for (const ex of exercises) {
     const firstChar = ex.name.charAt(0).toUpperCase();
     const key = /[A-Z]/.test(firstChar) ? firstChar : '#';
@@ -90,7 +82,7 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedExercises, setSelectedExercises] = useState<Set<string>>(new Set());
 
@@ -109,7 +101,7 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
       } else {
         endpoint = `/api/exercises`;
       }
-      const res = await api.request<{ exercises: Exercise[] }>('GET', endpoint);
+      const res = await api.request<{ exercises: ExerciseItem[] }>('GET', endpoint);
       if (res.success) setExercises(res.data?.exercises || []);
     } catch { /* ignore */ } finally {
       setLoading(false);
@@ -145,7 +137,7 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
     handleClose();
   };
 
-  const toggleSelect = (ex: Exercise) => {
+  const toggleSelect = (ex: ExerciseItem) => {
     setSelectedExercises(prev => {
       const next = new Set(prev);
       if (next.has(ex.id)) next.delete(ex.id);
@@ -174,7 +166,7 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
     title;
 
   // Render a single exercise row (used in both FlatList and SectionList)
-  const renderExerciseItem = (item: Exercise) => {
+  const renderExerciseItem = (item: ExerciseItem) => {
     const selected = selectedExercises.has(item.id);
     return (
       <TouchableOpacity style={s.exerciseRow} onPress={() => toggleSelect(item)}>

@@ -105,7 +105,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const nextStep = useCallback(() => {
-    setState((prev) => ({ ...prev, step: Math.min(prev.step + 1, 16) }));
+    setState((prev) => ({ ...prev, step: Math.min(prev.step + 1, 15) }));
   }, []);
 
   const prevStep = useCallback(() => {

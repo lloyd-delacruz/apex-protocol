@@ -42,37 +42,46 @@ export function createApiClient(options: ApiClientOptions) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
 
-    if (res.status === 401 || res.status === 403) {
-      onUnauthorized?.();
+      if (res.status === 401 || res.status === 403) {
+        onUnauthorized?.();
+      }
+
+      const json = (await res.json()) as ApiResponse<T>;
+      return json;
+    } catch (err: any) {
+      // Network error (device offline, server unreachable, DNS failure, etc.)
+      const message =
+        err?.message === 'Network request failed'
+          ? 'Cannot connect to server. Make sure the backend is running and your device is on the same network.'
+          : err?.message ?? 'Network request failed';
+      return { success: false, data: null, error: message };
     }
-
-    const json = (await res.json()) as ApiResponse<T>;
-    return json;
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
   const auth = {
     register: (email: string, password: string, name: string) =>
-      request<{ token: string; user: unknown }>('POST', '/api/auth/register', { email, password, name }),
+      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string; firstName?: string | null; lastName?: string | null; onboardingComplete?: boolean; subscriptionActive?: boolean } }>('POST', '/api/auth/register', { email, password, name }),
 
     login: (email: string, password: string) =>
-      request<{ token: string; user: unknown }>('POST', '/api/auth/login', { email, password }),
+      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string; firstName?: string | null; lastName?: string | null; onboardingComplete?: boolean; subscriptionActive?: boolean } }>('POST', '/api/auth/login', { email, password }),
 
     logout: (refreshToken?: string) =>
       request<null>('POST', '/api/auth/logout', refreshToken ? { refreshToken } : undefined),
 
     refresh: (refreshToken: string) =>
-      request<{ token: string; refreshToken: string; user: unknown }>('POST', '/api/auth/refresh', { refreshToken }),
+      request<{ token: string; refreshToken: string; user: { id: string; email: string; name: string; firstName?: string | null; lastName?: string | null; onboardingComplete?: boolean; subscriptionActive?: boolean } }>('POST', '/api/auth/refresh', { refreshToken }),
 
     me: () =>
-      request<{ user: unknown }>('GET', '/api/auth/me'),
+      request<{ user: { id: string; email: string; name: string; firstName?: string | null; lastName?: string | null; onboardingComplete?: boolean; subscriptionActive?: boolean } }>('GET', '/api/auth/me'),
   };
 
   // ─── Programs ──────────────────────────────────────────────────────────────
@@ -120,7 +129,26 @@ export function createApiClient(options: ApiClientOptions) {
 
   const workouts = {
     today: () =>
-      request<unknown>('GET', '/api/workouts/today'),
+      request<{
+        assignment: { id: string; programId: string; startDate: string | null };
+        program: { id: string; name: string; totalWeeks: number };
+        currentWeek: { id: string; weekNumber: number; absoluteWeekNumber: number };
+        workoutDay: {
+          id: string;
+          workoutType: string;
+          phase: string;
+          exercisePrescriptions: Array<{
+            id: string;
+            exerciseId: string;
+            targetRepRange: string | null;
+            targetSets: number | null;
+            sortOrder: number;
+            suggestedWeight: number;
+            weightUnit: string;
+            exercise: { id: string; name: string; muscleGroup: string | null; mediaUrl: string | null };
+          }>;
+        } | null;
+      }>('GET', '/api/workouts/today'),
 
     getByWeekAndDay: (programId: string, week: number, day: number) =>
       request<{ workoutDay: unknown }>('GET', `/api/workouts/${programId}/${week}/${day}`),
@@ -184,7 +212,7 @@ export function createApiClient(options: ApiClientOptions) {
 
     history: (params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }) => {
       const qs = params
-        ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+        ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))).toString()
         : '';
       return request<{ logs: unknown[]; total: number; limit: number; offset: number }>(
         'GET',
@@ -202,24 +230,26 @@ export function createApiClient(options: ApiClientOptions) {
     log: (data: {
       date?: string;
       body_weight_kg?: number;
+      body_weight_unit?: string;
       calories?: number;
       protein_g?: number;
       sleep_hours?: number;
       hunger?: number;
       mood?: number;
       training_performance?: number;
+      binge_urge?: number;
       notes?: string;
-    }) => request<{ metrics: unknown }>('POST', '/api/metrics', data),
+    }) => request<{ metrics: { id: string; date: string; body_weight_kg: number | null; body_weight_unit: string; calories: number | null; protein_g: number | null; sleep_hours: number | null; hunger: number | null; binge_urge: number | null; mood: number | null; training_performance: number | null; notes: string | null } }>('POST', '/api/metrics', data),
 
     history: (params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }) => {
       const qs = params
-        ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+        ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))).toString()
         : '';
-      return request<{ metrics: unknown[]; total: number }>('GET', `/api/metrics${qs}`);
+      return request<{ metrics: Array<{ id: string; date: string; body_weight_kg: number | null; body_weight_unit: string; calories: number | null; protein_g: number | null; sleep_hours: number | null; hunger: number | null; binge_urge: number | null; mood: number | null; training_performance: number | null; notes: string | null }>; total: number; limit: number; offset: number }>('GET', `/api/metrics${qs}`);
     },
 
     latest: () =>
-      request<{ metrics: unknown }>('GET', '/api/metrics/latest'),
+      request<{ metrics: { id: string; date: string; body_weight_kg: number | null; body_weight_unit: string; calories: number | null; protein_g: number | null; sleep_hours: number | null; hunger: number | null; binge_urge: number | null; mood: number | null; training_performance: number | null; notes: string | null } | null }>('GET', '/api/metrics/latest'),
 
     recovery: () =>
       request<{ recoveryScore: number }>('GET', '/api/metrics/recovery'),
@@ -230,8 +260,13 @@ export function createApiClient(options: ApiClientOptions) {
   const analytics = {
     dashboard: () =>
       request<{
-        weeklyVolume: { week: string; volume: number }[];
-        strengthTrends: unknown[];
+        weeklyVolume: Array<{ week: string; volume: number }>;
+        strengthTrends: Array<{
+          exercise: string;
+          dataPoints: Array<{ date: string; weight: number; status: string | null; totalReps: number | null }>;
+          currentWeight: number;
+          weightChangePct: number;
+        }>;
         adherence: {
           sessionsLast4Weeks: number;
           expectedSessions: number;
@@ -239,7 +274,20 @@ export function createApiClient(options: ApiClientOptions) {
           streak: number;
         };
         recoveryScore: number;
-        recentMetrics: unknown[];
+        recentMetrics: Array<{
+          id: string;
+          date: string;
+          body_weight_kg: number | null;
+          mood: number | null;
+          sleep_hours: number | null;
+          training_performance: number | null;
+        }>;
+        statusBreakdown: {
+          achieved: number;
+          progress: number;
+          failed: number;
+          total: number;
+        };
       }>('GET', '/api/analytics/dashboard'),
   };
 

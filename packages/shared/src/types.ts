@@ -38,7 +38,7 @@ export interface ProgramDay {
 export interface Exercise {
   id: string;
   name: string;
-  muscle_group: string;
+  muscle_group: string | null;
   equipment: string | null;
 }
 

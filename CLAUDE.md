@@ -1,32 +1,22 @@
-# CLAUDE.md — Apex Protocol AI Development Rules
+# CLAUDE.md - Apex Protocol AI Development Rules (Mobile-First)
 
-This file defines the **development rules for AI agents** working on the **Apex Protocol** project.
+This document defines the strict development rules for AI agents working on the Apex Protocol project.
 
-The purpose is to ensure that all generated code is:
+All generated code must be:
 
-- production quality
+- production-ready
 - consistent
 - scalable
 - secure
 - maintainable
 
-This document governs:
-
-- Frontend (Web)
-- Mobile (React Native)
-- Backend APIs
-- Database design
-- System architecture
-
 ---
 
-# Project Overview
+## 1. Project Overview
 
-**Project Name**
+**Project Name:** Apex Protocol
 
-Apex Protocol
-
-Apex Protocol is a **training performance system** that tracks:
+Apex Protocol is a **mobile-first training performance system** that tracks:
 
 - workout programs
 - strength progression
@@ -35,392 +25,204 @@ Apex Protocol is a **training performance system** that tracks:
 - body metrics
 - training status (achieved / progress / failed)
 
-The system is designed to support:
-
-- Web dashboard
-- iOS application
-- Android application
+The system is designed as a **mobile application (primary)** supported by a backend API.
 
 ---
 
-# Technology Stack
+## 2. Core System Architecture
 
-Frontend Web
+This is a mobile-first architecture:
 
-React  
-Next.js  
-Tailwind CSS  
+```
+Mobile App (Client)
+  → Backend API
+    → PostgreSQL Database
 
-Mobile
-
-React Native  
-Expo  
-
-Backend
-
-Node.js  
-FastAPI (Python services if needed)  
-
-Database
-
-PostgreSQL
-
-Infrastructure
-
-Docker  
-REST APIs  
-JWT Authentication
+Optional future:
+  → Python services (analytics / ML)
+```
 
 ---
 
-# Repository Structure
+## 3. Technology Stack
 
+### Mobile (Primary Client)
 
+- React Native
+- Expo
+
+### Backend
+
+- Node.js (primary API)
+- FastAPI (optional for ML / analytics)
+
+### Database
+
+- PostgreSQL
+- Prisma ORM
+
+### Infrastructure
+
+- Docker
+- REST APIs
+- JWT Authentication
+
+---
+
+## 4. Repository Structure
+
+```
 apex-protocol/
+├── apps/mobile/   → React Native app (iOS + Android)
+├── backend/       → API + business logic
+├── packages/      → shared code/types
+└── docs/          → architecture + specs
+```
 
-frontend/
-mobile/
-backend/
-database/
-docs/
-
-
-Frontend → Web interface  
-Mobile → iOS and Android app  
-Backend → APIs and business logic  
-Database → schema + migrations  
-Docs → architecture documentation
+> No `web/` or `frontend/` folder — web has been removed.
 
 ---
 
-# Mandatory AI Behavior
+## 5. Mandatory AI Behavior
 
 Before generating any code:
 
-1. Read this entire CLAUDE.md file.
-2. Check project structure.
-3. Identify if the task affects:
-
-   - frontend
+1. Read this entire `CLAUDE.md`
+2. Identify which layer is affected:
    - mobile
    - backend
    - database
+3. Follow the rules for that layer
 
-4. Follow the rules defined in the relevant section.
-
-Never skip these steps.
-
----
-
-# Design Rules (Frontend + Mobile)
-
-## Reference Design Rule
-
-If a reference design or screenshot exists:
-
-- Match layout exactly
-- Match spacing exactly
-- Match typography exactly
-- Match colors exactly
-
-Do not:
-
-- redesign
-- add sections
-- improve layout
-
-Your goal is **visual accuracy**.
+Never skip this process.
 
 ---
 
-# If No Design Exists
+## 6. Mobile Development Rules (React Native)
 
-When designing from scratch:
+### Framework
 
-Follow modern UI principles:
+- React Native + Expo ONLY
 
-- clear hierarchy
-- consistent spacing
-- high contrast
-- minimal design
-- responsive layout
-- mobile-first
+### UI Requirements
 
-Avoid generic templates.
+- mobile-first design
+- clean, minimal, modern UI
+- high usability for frequent gym use
 
----
+### UX Principles
 
-# Brand Assets
+- fast interactions (1–2 taps max per action)
+- large touch targets
+- minimal input friction
+- offline-friendly where possible
 
-Always check the folder:
+### Design System
 
+- use centralized design tokens (colors, spacing, typography)
+- consistent spacing system (4 / 8 / 16 / 24 / 32)
+- no random inline styles
 
-brand_assets/
+### Component Rules
 
+- reusable components only
+- no duplicated UI logic
+- separate UI from logic
 
-Assets may include:
+### Performance Rules
 
-- logo
-- color palette
-- typography
-- images
-
-If assets exist:
-
-- use them
-- do not invent colors
-- do not replace logos
-
----
-
-# Frontend Rules (Web)
-
-Framework
-
-React + Next.js
-
-Styling
-
-Tailwind CSS
-
-Default Output
-
-- responsive layout
-- semantic HTML
-- accessibility compliant
-
-Avoid:
-
-- inline random styling
-- excessive dependencies
-- unnecessary libraries
+- avoid unnecessary re-renders
+- use memoization where needed
+- lazy load heavy screens
 
 ---
 
-# UI Design Guardrails
+## 7. Navigation Rules
 
-## Colors
+Use: **Expo Router** or **React Navigation**
 
-Never use default Tailwind colors as primary brand colors:
+Structure:
 
-
-blue-500
-indigo-500
-
-
-Define custom palette.
-
----
-
-## Typography
-
-Headings and body text must use different fonts.
-
-Example
-
-Heading → display / serif  
-Body → clean sans serif
-
-Rules
-
-- tight letter spacing on headings
-- large line height on body text
+```
+Auth Flow (Login / Register)
+Main App (Tabs)
+  ├── Dashboard
+  ├── Workouts
+  ├── Progress
+  └── Profile
+Deep Screens (Stack)
+```
 
 ---
 
-## Shadows
+## 8. Backend Development Rules
 
-Avoid flat shadows like:
+Backend is the **single source of truth**.
 
-
-shadow-md
-
-
-Prefer layered shadows:
-
-
-shadow-[0_20px_40px_rgba(0,0,0,0.08)]
-
-
----
-
-## Animation Rules
-
-Allowed properties
-
-- transform
-- opacity
-
-Never use
-
-
-transition-all
-
-
----
-
-# React Native Rules (iOS + Android)
-
-The mobile app must use:
-
-React Native  
-Expo
-
-The UI must:
-
-- match the web design system
-- share design tokens
-- maintain platform consistency
-
-Do not use platform-specific UI unless required.
-
-Always ensure:
-
-- touch-friendly UI
-- proper spacing
-- accessible font sizes
-
----
-
-# Responsive Design Rules
-
-Every interface must support:
-
-Mobile  
-Tablet  
-Desktop
-
-Layout priority
-
-
-Mobile → Tablet → Desktop
-
-
-Never design desktop first.
-
----
-
-# Image Handling
-
-Placeholder images must use:
-
-
-https://placehold.co/WIDTHxHEIGHT
-
-
-Example
-
-
-https://placehold.co/1200x800
-
-
----
-
-# Backend Development Rules
-
-Backend services power:
-
-- workout logging
-- program tracking
-- body metrics
-- authentication
-- analytics
-
-Backend must follow **clean architecture**.
-
----
-
-# Backend Architecture
-
-
+```
 backend/
-
-controllers/
-services/
-repositories/
-models/
-routes/
-middleware/
-utils/
-config/
-
-
-Controllers
-
-Handle HTTP requests.
-
-Services
-
-Contain business logic.
-
-Repositories
-
-Handle database operations.
-
-Models
-
-Define data structures.
+├── controllers/    → handle requests
+├── services/       → business logic
+├── repositories/   → DB access
+├── models/
+├── routes/
+├── middleware/
+├── utils/
+└── config/
+```
 
 ---
 
-# API Design
+## 9. API Design Standards
 
-APIs must follow REST standards.
+RESTful APIs only.
 
-Example
-
-
-GET /api/programs
-GET /api/workouts
+```
+GET  /api/programs
+GET  /api/workouts
 POST /api/training-log
 POST /api/body-metrics
+```
 
+Response format:
 
-All responses must follow consistent structure:
-
-
+```json
 {
-"success": true,
-"data": {},
-"error": null
+  "success": true,
+  "data": {},
+  "error": null
 }
-
+```
 
 ---
 
-# Authentication Rules
+## 10. Authentication Rules
 
-Authentication uses:
+Use: **JWT (access + refresh tokens)**
 
-JWT tokens
-
-Required endpoints:
-
-
-POST /auth/login
+```
 POST /auth/register
+POST /auth/login
 POST /auth/refresh
 POST /auth/logout
+```
 
+Security:
 
-Passwords must be:
-
-- hashed
-- salted
-
-Never store plaintext passwords.
+- passwords must be hashed (bcrypt)
+- never store plaintext passwords
+- always validate tokens
 
 ---
 
-# Database Rules
+## 11. Database Rules
 
-Database
+- **Database:** PostgreSQL
+- **ORM:** Prisma
 
-PostgreSQL
+### Core Tables
 
-Tables include:
-
-
+```
 users
 workout_programs
 workout_weeks
@@ -429,81 +231,105 @@ exercise_prescriptions
 training_logs
 body_metrics
 exercises
+```
 
+### Required Fields (every table)
 
-All tables must include:
-
-
+```
 id
 created_at
 updated_at
+```
 
+### Rules
 
-Use foreign keys properly.
+- use foreign keys
+- normalize data properly
+- avoid duplicated fields
 
 ---
 
-# Workout Progression Logic
+## 12. Workout Logic (CRITICAL)
 
 Backend must compute:
 
-- lower rep target
-- upper rep target
-- total reps
-- readiness for progression
+- rep ranges
+- progression readiness
 - next weight recommendation
 
-Status logic:
+### Status Logic
 
-ACHIEVED
-
-All sets reached upper rep.
-
-PROGRESS
-
-Reps within target range.
-
-FAILED
-
-Below lower rep threshold.
+| Status | Condition |
+|--------|-----------|
+| `ACHIEVED` | All sets hit upper rep target |
+| `PROGRESS` | Within rep range |
+| `FAILED` | Below minimum threshold |
 
 ---
 
-# Security Rules
+## 13. Security Rules
 
 All backend code must include:
 
-- input validation
+- input validation (Zod or Joi)
 - JWT verification
 - rate limiting
 - SQL injection protection
-- structured error responses
+- sanitized outputs
 
-Never expose internal errors.
+Never expose:
+
+- stack traces
+- internal errors
+- database queries
 
 ---
 
-# Performance Rules
+## 14. Performance Rules
+
+Must follow:
+
+- indexed queries
+- pagination for large datasets
+- avoid N+1 queries
+- efficient DB access
 
 Avoid:
 
-- unnecessary queries
+- unnecessary API calls
+- large payloads
 - blocking operations
-- large payload responses
-
-Prefer:
-
-- indexed queries
-- pagination
-- caching when needed
 
 ---
 
-# Documentation Rules
+## 15. Mobile ↔ Backend Communication
 
-All new modules must include documentation.
+Mobile must:
 
-Every service must include:
+- never contain business logic
+- always rely on backend calculations
+- handle loading + error states properly
+
+Use:
+
+- centralized API client
+- retry logic for failed requests
+
+---
+
+## 16. Offline Strategy (IMPORTANT)
+
+Mobile app should:
+
+- cache recent workouts
+- allow temporary offline logging
+- sync when connection returns
+
+---
+
+## 17. Documentation Rules
+
+Every new module must include:
 
 - purpose
 - inputs
@@ -512,44 +338,47 @@ Every service must include:
 
 ---
 
-# Local Development
+## 18. Local Development
 
-## Ports
+### Ports
 
-| Service | Local Port | URL |
-|---------|------------|-----|
-| Web Client | 4000 | `http://localhost:4000` |
-| Mobile API | 4001 | `http://localhost:4001` (or LAN IP) |
+| Service | Port | URL |
+|---------|------|-----|
 | Backend API | 4001 | `http://localhost:4001` |
 
-- **Web Client (4000)**: Serves the Next.js frontend and proxies `/api/*` requests to port 4001 internally.
-- **Mobile Client**: Connects directly to the Backend API on port 4001. If testing on a physical device via Expo Go, you MUST use your machine's LAN IP (e.g. `http://192.168.1.XX:4001`) instead of `localhost`.
-- **Backend (4001)**: The source of truth for all API requests.
+**Mobile (Expo):**
+
+- use LAN IP for real devices
+- do NOT use `localhost`
 
 ---
 
-# Hard Constraints
+## 19. Hard Constraints
 
-AI must never:
+AI must **NEVER**:
 
 - generate insecure authentication
 - store plaintext passwords
-- add UI elements not requested
-- redesign reference layouts
-- invent brand assets
-- use transition-all
-- use Tailwind default blue or indigo as primary brand colors
+- mix business logic into UI
+- duplicate components
+- ignore architecture layers
+- add unused dependencies
 
 ---
 
-# Development Philosophy
+## 20. Development Philosophy
 
-Apex Protocol prioritizes:
+Apex Protocol is built as a **high-performance, production-grade fitness system**.
 
-- clarity
-- performance
-- maintainability
+Focus on:
+
+- simplicity
+- speed
+- accuracy
 - scalability
-- user experience
 
-The system should evolve into a **professional performance training platform**.
+Every feature must:
+
+- solve a real user problem
+- be intuitive
+- be fast

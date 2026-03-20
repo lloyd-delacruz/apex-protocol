@@ -6,15 +6,14 @@ The goal is to transform traditional workout logging into a **progressive overlo
 
 Apex Protocol is designed to run across:
 
-- Web applications
 - iOS applications
 - Android applications
 
-using a shared architecture.
+using a shared mobile-first architecture.
 
 ---
 
-# Core Concept
+## Core Concept
 
 Apex Protocol tracks **training performance and recovery signals** to determine whether an athlete is progressing effectively.
 
@@ -32,77 +31,75 @@ The system classifies performance automatically to guide training decisions.
 
 ---
 
-# Training Status System
+## Training Status System
 
 Each exercise session receives a performance status:
 
 | Status | Meaning |
-|------|------|
+|--------|---------|
 | ACHIEVED | All sets reached the upper rep target |
 | PROGRESS | Reps are within the target range |
 | FAILED | Reps fell below the lower rep threshold |
 
-Color coding is used to visualize training outcomes.
+Color coding is used to visualize training outcomes:
 
-
-🟢 ACHIEVED
-🟡 PROGRESS
-🔴 FAILED
-
+- **ACHIEVED** - green
+- **PROGRESS** - yellow
+- **FAILED** - red
 
 ---
 
-# 12 Week Training Structure
+## 12 Week Training Structure
 
 The system follows a structured **three phase training cycle**.
 
 | Phase | Weeks | Objective |
-|------|------|------|
-| Phase 1 | Weeks 1–4 | Foundation & Rep Progression |
-| Phase 2 | Weeks 5–8 | Load & Volume Progression |
-| Phase 3 | Weeks 9–12 | Strength & Intensity Peak |
+|-------|-------|-----------|
+| Phase 1 | Weeks 1-4 | Foundation & Rep Progression |
+| Phase 2 | Weeks 5-8 | Load & Volume Progression |
+| Phase 3 | Weeks 9-12 | Strength & Intensity Peak |
 
 ---
 
-# Weekly Training Schedule
+## Weekly Training Schedule
 
-
-Mon — Upper Strength
-Tue — Lower Strength
-Wed — Cardio + Core
-Thu — Upper Hypertrophy
-Fri — Lower Hypertrophy
-Sat — Cardio
-Sun — Rest / Mobility
-
+```
+Mon - Upper Strength
+Tue - Lower Strength
+Wed - Cardio + Core
+Thu - Upper Hypertrophy
+Fri - Lower Hypertrophy
+Sat - Cardio
+Sun - Rest / Mobility
+```
 
 ---
 
-# Training Metrics
+## Training Metrics
 
 Each exercise session tracks the following fields:
 
 | Metric | Description |
-|------|------|
-Weight | Load used for the exercise |
-Set 1–4 | Reps performed per set |
-RIR | Reps In Reserve (training intensity indicator) |
-Total Reps | Sum of all sets |
-Lower Rep | Minimum rep threshold |
-Upper Rep | Maximum rep target |
-Ready | Determines progression eligibility |
-Next Week Weight | Recommended load increase |
-Status | Training outcome classification |
+|--------|-------------|
+| Weight | Load used for the exercise |
+| Set 1-4 | Reps performed per set |
+| RIR | Reps In Reserve (training intensity indicator) |
+| Total Reps | Sum of all sets |
+| Lower Rep | Minimum rep threshold |
+| Upper Rep | Maximum rep target |
+| Ready | Determines progression eligibility |
+| Next Week Weight | Recommended load increase |
+| Status | Training outcome classification |
 
 ---
 
-# Example Progression
+## Example Progression
 
 Example session:
 
-
+```
 Bench Press
-Target: 4–6 reps
+Target: 4-6 reps
 
 Weight: 90 lbs
 
@@ -111,24 +108,15 @@ Set 2: 6
 Set 3: 6
 Set 4: 6
 
-
-Status:
-
-
-ACHIEVED
-
-
-Next recommended weight:
-
-
-95 lbs
-
+Status: ACHIEVED
+Next recommended weight: 95 lbs
+```
 
 If rep targets are not reached, the system marks the session as **PROGRESS** or **FAILED**.
 
 ---
 
-# Body Metrics Tracking
+## Body Metrics Tracking
 
 In addition to workout data, Apex Protocol tracks recovery indicators.
 
@@ -147,124 +135,103 @@ These metrics help correlate **training output with recovery quality**.
 
 ---
 
-# Technology Stack
+## Technology Stack
 
-Apex Protocol is designed as a **full stack cross platform system**.
+Apex Protocol is designed as a **mobile-first cross platform system**.
 
-## Frontend
+### Mobile (Primary)
 
-React  
-Next.js  
-Tailwind CSS  
+- React Native
+- Expo
+- iOS and Android
 
-## Mobile
+### Backend
 
-React Native  
-Expo  
+- Node.js
+- FastAPI (optional services)
 
-Supports:
+### Database
 
-- iOS
-- Android
+- PostgreSQL
+- Prisma ORM
 
-## Backend
+### Infrastructure
 
-Node.js  
-FastAPI (optional services)
-
-## Database
-
-PostgreSQL
-
-## Infrastructure
-
-Docker  
-REST APIs  
-JWT Authentication
+- Docker
+- REST APIs
+- JWT Authentication
 
 ---
 
-# Project Structure
+## Project Structure
 
-
+```
 apex-protocol/
-
-frontend/
-Web application interface
-
-mobile/
-React Native mobile application
-
-backend/
-API services and business logic
-
-database/
-schema definitions and migrations
-
-docs/
-architecture and design documentation
-
-brand_assets/
-logos, color palettes, brand guidelines
-
+├── apps/mobile/   -> React Native app (iOS + Android)
+├── backend/       -> API services and business logic
+├── packages/      -> shared code and types
+└── docs/          -> architecture and design documentation
+```
 
 ---
 
-# Backend Architecture
+## Backend Architecture
 
 Backend services follow a modular structure.
 
-
+```
 backend/
-
-controllers/
-services/
-repositories/
-models/
-routes/
-middleware/
-utils/
-config/
-
-
-Responsibilities:
-
-Controllers → handle HTTP requests  
-Services → business logic  
-Repositories → database access  
-Models → data structures  
+├── controllers/   -> handle HTTP requests
+├── services/      -> business logic
+├── repositories/  -> database access
+├── models/        -> data structures
+├── routes/
+├── middleware/
+├── utils/
+└── config/
+```
 
 ---
 
-# API Design
+## API Design
 
 Example endpoints:
 
-
-GET /api/programs
-GET /api/workouts
+```
+GET  /api/programs
+GET  /api/workouts
 POST /api/training-log
 POST /api/body-metrics
-
+```
 
 Authentication endpoints:
 
-
+```
 POST /auth/register
 POST /auth/login
 POST /auth/refresh
 POST /auth/logout
+```
 
+All responses follow this structure:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+```
 
 ---
 
-# Database Schema (Core Tables)
+## Database Schema (Core Tables)
 
-The database uses PostgreSQL.
+The database uses PostgreSQL with Prisma ORM.
 
-Core tables include:
+Core tables:
 
-
+```
 users
 workout_programs
 workout_weeks
@@ -273,51 +240,45 @@ exercise_prescriptions
 training_logs
 body_metrics
 exercises
-
+```
 
 Each table includes standard audit fields:
 
-
+```
 id
 created_at
 updated_at
-
+```
 
 ---
 
-# Development Philosophy
+## Development Philosophy
 
 Apex Protocol prioritizes:
 
 **Progressive Overload**
 
-
-increase weight
-increase reps
-improve performance
-
+- increase weight
+- increase reps
+- improve performance
 
 **Recovery Awareness**
 
-
-sleep
-nutrition
-stress management
-
+- sleep
+- nutrition
+- stress management
 
 **Consistency**
 
-
-4 strength sessions
-2 conditioning sessions
-1 recovery day
-
+- 4 strength sessions
+- 2 conditioning sessions
+- 1 recovery day
 
 The goal is **sustainable performance improvement without burnout**.
 
 ---
 
-# Roadmap
+## Roadmap
 
 Planned platform features include:
 
@@ -331,7 +292,7 @@ Planned platform features include:
 
 ---
 
-# Target Users
+## Target Users
 
 Apex Protocol is designed for:
 
@@ -343,51 +304,51 @@ Apex Protocol is designed for:
 
 ---
 
-# Local Development
+## Local Development
 
-## Ports
+### Ports
 
-| Service | URL |
-|---------|-----|
-| Application (Web + API) | http://localhost:4000 |
+| Service | Port | URL |
+|---------|------|-----|
+| Backend API | 4001 | `http://localhost:4001` |
 
-The web client runs on `http://localhost:4000` and automatically proxies `/api` requests to the backend (which runs internally on a hidden port like 4001).
-All local access (web browsing and API calls) MUST use `http://localhost:4000`. No other localhost ports should be accessed directly.
-To override the API URL for staging/production, set `NEXT_PUBLIC_API_URL` in your environment.
+**Mobile (Expo):** use your machine's LAN IP for real devices — do NOT use `localhost`.
 
 ---
 
-# Exercise Library
+## Exercise Library
 
 Apex Protocol includes a curated exercise library of 500+ exercises sourced from the **RapidAPI ExerciseDB** API, enriched with taxonomy metadata via an automated classification pipeline.
 
-## RapidAPI Integration
+### RapidAPI Integration
 
-Exercise data is fetched from ExerciseDB via [RapidAPI](https://rapidapi.com/justin-WFnsXH_t6/api/exercisedb).
+Exercise data is fetched from ExerciseDB via RapidAPI.
 
 The integration uses:
-- `ExerciseDbService` — HTTP client for the API (no database writes)
-- `ExerciseImportService` — normalises and persists exercises with deduplication
-- `ExerciseClassificationService` — assigns taxonomy via heuristic pipeline
 
-## Required Environment Variables
+- `ExerciseDbService` - HTTP client for the API (no database writes)
+- `ExerciseImportService` - normalises and persists exercises with deduplication
+- `ExerciseClassificationService` - assigns taxonomy via heuristic pipeline
+
+### Required Environment Variables
 
 Set these in `backend/.env` before running import commands:
 
 | Variable | Description |
 |----------|-------------|
 | `EXERCISEDB_API_KEY` | Your RapidAPI API key |
-| `EXERCISEDB_API_HOST` | API host — `exercisedb.p.rapidapi.com` |
-| `EXERCISEDB_BASE_URL` | Base URL — `https://exercisedb.p.rapidapi.com` |
+| `EXERCISEDB_API_HOST` | API host - `exercisedb.p.rapidapi.com` |
+| `EXERCISEDB_BASE_URL` | Base URL - `https://exercisedb.p.rapidapi.com` |
 
 Example `backend/.env`:
+
 ```
 EXERCISEDB_API_KEY=your_rapidapi_key_here
 EXERCISEDB_API_HOST=exercisedb.p.rapidapi.com
 EXERCISEDB_BASE_URL=https://exercisedb.p.rapidapi.com
 ```
 
-## Import Commands
+### Import Commands
 
 Run these from the `backend/` directory:
 
@@ -400,11 +361,12 @@ npx ts-node-dev --transpile-only src/scripts/importExercises.ts
 ```
 
 The import script is safe to re-run. It uses a three-tier deduplication strategy:
-1. Match by `(externalId, externalSource)` — exact re-sync of previously imported exercise
-2. Match by name — enrich an existing hand-authored exercise with media/metadata
-3. No match — create new exercise record
 
-## Importing a Subset
+1. Match by `(externalId, externalSource)` - exact re-sync of previously imported exercise
+2. Match by name - enrich an existing hand-authored exercise with media/metadata
+3. No match - create new exercise record
+
+### Importing a Subset
 
 The `ExerciseImportService` supports targeted imports:
 
@@ -416,7 +378,7 @@ await ExerciseImportService.importByBodyPart('chest');
 await ExerciseImportService.importByEquipment('barbell');
 ```
 
-## Exercise Taxonomy Fields
+### Exercise Taxonomy Fields
 
 Each exercise is automatically classified with these enriched fields:
 
@@ -433,7 +395,7 @@ Each exercise is automatically classified with these enriched fields:
 | `isUnilateral` | true / false | Single-limb movement flag |
 | `equipment` | barbell, dumbbell, cable, machine, kettlebell, band, bodyweight, cardio_machine, mixed, none | Equipment required |
 
-## Exercise API Endpoints
+### Exercise API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -447,7 +409,9 @@ Each exercise is automatically classified with these enriched fields:
 | GET | `/api/exercises/:id` | Single exercise with substitutions |
 | GET | `/api/exercises/:id/substitutions` | Substitution options only |
 
-### Supported Query Parameters for `/api/exercises` and `/api/exercises/filter`
+### Supported Query Parameters
+
+For `/api/exercises` and `/api/exercises/filter`:
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
@@ -464,6 +428,6 @@ Each exercise is automatically classified with these enriched fields:
 
 ---
 
-# License
+## License
 
 MIT License

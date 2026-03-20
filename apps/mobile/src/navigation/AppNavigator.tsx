@@ -1,3 +1,13 @@
+/**
+ * AppNavigator — DEPRECATED
+ *
+ * This file is kept for reference only.
+ * The app now uses src/navigation/index.tsx (RootNavigator) as the entry point,
+ * composed of AuthNavigator, OnboardingNavigator, and MainNavigator.
+ *
+ * App.tsx imports RootNavigator directly from src/navigation.
+ */
+
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -5,12 +15,13 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import WorkoutScreen from '../screens/WorkoutScreen';
-import BodyScreen from '../screens/BodyScreen';
-import TargetsScreen from '../screens/TargetsScreen';
-import LogScreen from '../screens/LogScreen';
-import LoginScreen from '../screens/LoginScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
+import DashboardScreen from '../screens/dashboard/DashboardScreen';
+import WorkoutScreen from '../screens/workout/WorkoutScreen';
+import ProgressScreen from '../screens/progress/ProgressScreen';
+import BodyScreen from '../screens/body/BodyScreen';
+import TargetsScreen from '../screens/targets/TargetsScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
 // ─── Navigators ───────────────────────────────────────────────────────────────
 
@@ -42,10 +53,24 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
         name="Workout"
         component={WorkoutScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Progress"
+        component={ProgressScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="trending-up-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -60,13 +85,6 @@ function MainTabs() {
         component={TargetsScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Log"
-        component={LogScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>

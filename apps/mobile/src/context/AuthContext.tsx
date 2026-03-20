@@ -1,18 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { login as apiLogin, register as apiRegister, logout as apiLogout, loadToken } from '../lib/api';
 import api from '../lib/api';
+import type { AuthUser } from '../types/api';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  onboardingComplete?: boolean;
-  subscriptionActive?: boolean;
-}
+export type { AuthUser };
 
 interface AuthContextValue {
   user: AuthUser | null;
