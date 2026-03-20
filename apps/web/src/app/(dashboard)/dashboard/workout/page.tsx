@@ -2,22 +2,17 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Play, 
-  Settings, 
-  ChevronRight, 
-  History, 
-  Trophy,
+import {
+  Play,
+  ChevronRight,
   Activity,
   Plus,
-  ArrowRight,
   Clock,
   Flame,
   Zap,
   MoreVertical
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
 import api, { ApiTodayWorkout, ApiExercise, ApiPendingProgression } from '@/lib/api';
 import ExerciseLibrary from '@/components/workout/ExerciseLibrary';
 import ActiveSetLogger from '@/components/workout/ActiveSetLogger';
@@ -29,7 +24,7 @@ import ExerciseOptionsBottomSheet from '@/components/workout/ExerciseOptionsBott
 import WorkoutSummary from '@/components/workout/WorkoutSummary';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type WorkoutState = 'idle' | 'active' | 'saving' | 'completed';
+type WorkoutState = 'idle' | 'active' | 'saving' | 'completed' | 'streak';
 
 interface LoggedSet {
   id: string;
@@ -278,100 +273,177 @@ export default function WorkoutPage() {
     </div>
   );
 
-  // ── Idle State (Hero View) ──────────────────────────────────────────────────
+  // ── Idle State (Day Overview) ──────────────────────────────────────────────
   if (workoutState === 'idle') {
-    const monthNumber = Math.ceil((todayWorkout?.currentWeek?.absoluteWeekNumber || 1) / 4);
-    const weekNumber = todayWorkout?.currentWeek?.weekNumber || 1;
-    const dayNumber = todayWorkout?.workoutDay?.sortOrder || 1;
-    const phaseNames = ['Foundation', 'Development', 'Intensification'];
-    const phaseName = phaseNames[monthNumber - 1] || 'Active Phase';
+    const workoutName = todayWorkout?.workoutDay?.workoutType || 'Strength Day';
+    const uniqueMuscles = [...new Set(exercises.map(ex => ex.muscleGroup).filter(Boolean))].length;
+    const weekNum = todayWorkout?.currentWeek?.absoluteWeekNumber || 1;
+    const phaseNum = Math.ceil(weekNum / 4);
 
     return (
-      <div className="max-w-xl mx-auto pt-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="text-center mb-12">
-          {/* Program Context Chip */}
-          <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1.5 mb-8 shadow-xl">
-             <div className="px-4 py-1.5 rounded-xl bg-accent text-white text-[10px] font-black uppercase tracking-widest shadow-accent-sm">
-               Phase {monthNumber}: {phaseName}
-             </div>
-             <div className="px-4 py-1.5 text-text-muted text-[10px] font-bold uppercase tracking-widest">
-               Week {weekNumber} · Day {dayNumber}
-             </div>
+      <div className="max-w-xl mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-3 pt-6 px-1 mb-6">
+          <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-white text-xs font-black shrink-0">
+            LD
+          </div>
+          <button className="flex items-center gap-1 text-sm font-semibold text-text-muted hover:text-text-primary transition-colors">
+            My Plan <ChevronRight size={14} />
+          </button>
+        </div>
+
+        {/* Workout Header Card */}
+        <div className="bg-surface-elevated border border-white/[0.08] rounded-3xl p-5 mb-5">
+          {/* Title row */}
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="flex-1 text-3xl font-black italic text-text-primary leading-none truncate">
+              {workoutName}
+            </h1>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-text-muted hover:text-text-primary text-xs font-bold transition-colors">
+              <span className="rotate-90 inline-block">⇄</span> Swap
+            </button>
+            <button className="p-1 text-text-muted hover:text-text-primary transition-colors">
+              <MoreVertical size={20} />
+            </button>
           </div>
 
-          <div className="relative mb-8 flex justify-center group">
-             <div className="w-24 h-24 rounded-[32px] bg-gradient-to-br from-accent to-[#7B61FF] rotate-12 flex items-center justify-center shadow-accent-elevated group-hover:rotate-0 transition-transform duration-500">
-                <Activity size={40} className="text-white -rotate-12 group-hover:rotate-0 transition-transform duration-500" />
-             </div>
-             <div className="absolute -top-2 right-[38%] w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center border border-white/10 shadow-lg animate-bounce">
-                <span className="text-xs">💪</span>
-             </div>
-          </div>
-
-          <h1 className="text-5xl font-bold text-text-primary tracking-tight leading-[0.9] mb-4">
-            Today&apos;s <span className="text-gradient-accent">Protocol</span>
-          </h1>
-          <p className="text-text-muted text-lg max-w-sm mx-auto font-medium">
-            {todayWorkout?.workoutDay?.workoutType || 'Custom Strength Session'}
-            <br />
-            <span className="text-text-muted/60 text-sm italic">{exercises.length} Exercises · Approx. 45-60 min</span>
+          {/* Subtitle */}
+          <p className="text-sm text-text-muted font-medium mb-4">
+            {exercises.length} Exercise{exercises.length !== 1 ? 's' : ''} · {uniqueMuscles || 1} Muscle{uniqueMuscles !== 1 ? 's' : ''}
           </p>
+
+          {/* Filter chips */}
+          <div className="flex items-center gap-2">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-text-muted text-xs font-bold hover:border-accent/40 transition-colors">
+              <Clock size={12} /> 1h 15m <ChevronRight size={10} className="rotate-90" />
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-text-muted text-xs font-bold hover:border-accent/40 transition-colors">
+              Equipment <ChevronRight size={10} className="rotate-90" />
+            </button>
+          </div>
         </div>
 
         {pendingProgressions.length > 0 && (
-          <div className="mb-10">
-            <ProgressionPromptBanner 
+          <div className="mb-5">
+            <ProgressionPromptBanner
               progressions={pendingProgressions}
               onUpdate={setPendingProgressions}
             />
           </div>
         )}
 
-        {/* Start Button Hero */}
-        <div className="mb-12">
-          <Button 
-            variant="primary" 
-            fullWidth 
-            className="h-20 rounded-[32px] text-xl font-bold tracking-tight shadow-accent-elevated flex gap-4 group overflow-hidden relative"
-            onClick={startWorkout}
+        {/* Exercise List */}
+        <div className="space-y-0">
+          {exercises.map((ex, i) => (
+            <div key={ex.prescriptionId} className="relative">
+              {/* Vertical connector line */}
+              {i < exercises.length - 1 && (
+                <div className="absolute left-[28px] top-[72px] w-px h-6 bg-white/[0.08] z-10" />
+              )}
+              <div className="flex items-center gap-3 py-3 group">
+                {/* Split thumbnail */}
+                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 flex border border-white/[0.06]">
+                  <div className="flex-1 bg-black/30 overflow-hidden">
+                    {ex.mediaUrl ? (
+                      <img src={ex.mediaUrl} alt={ex.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-surface-elevated">
+                        <Activity size={16} className="text-text-muted/40" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-px bg-white/[0.06]" />
+                  <div className="flex-1 flex items-center justify-center bg-surface-elevated">
+                    <div className="text-text-muted/20 text-center">
+                      <Activity size={16} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  {i === 0 && (
+                    <p className="text-[10px] font-black text-warning uppercase tracking-widest mb-0.5">FOCUS EXERCISE</p>
+                  )}
+                  <h4 className="text-sm font-bold text-text-primary truncate">{ex.name}</h4>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {ex.setCount} sets · {ex.repMin}-{ex.repMax} reps
+                    {(ex as any).suggestedWeight ? ` · ${(ex as any).suggestedWeight} lb` : ''}
+                  </p>
+                </div>
+
+                {/* Options */}
+                <button
+                  onClick={() => { setSelectedOptionsIdx(i); setShowOptions(true); }}
+                  className="p-1.5 text-text-muted hover:text-text-primary transition-colors opacity-60 group-hover:opacity-100"
+                >
+                  <MoreVertical size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Add Exercise */}
+          <button
+            onClick={() => setShowLibrary(true)}
+            className="flex items-center gap-3 py-4 w-full text-left group"
           >
-            <div className="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
-            <span className="relative z-10 font-black uppercase tracking-tighter">Ignite Session</span>
-            <Play size={24} fill="currentColor" className="relative z-10 group-hover:scale-125 transition-transform duration-300" />
-          </Button>
+            <div className="w-14 h-14 rounded-xl border-2 border-dashed border-accent/30 flex items-center justify-center group-hover:border-accent transition-colors shrink-0">
+              <Plus size={20} className="text-accent/60 group-hover:text-accent transition-colors" />
+            </div>
+            <span className="text-sm font-bold text-accent/70 group-hover:text-accent transition-colors">Add Exercise</span>
+          </button>
         </div>
 
-        {/* Protocol Preview */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2 mb-4">
-             <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Protocol Preview</h3>
-             <div className="h-px flex-1 bg-white/[0.06] ml-4" />
-          </div>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {exercises.map((ex, i) => (
-              <div 
-                key={ex.prescriptionId} 
-                className="flex items-center gap-4 p-4 rounded-[24px] bg-white/[0.02] border border-white/[0.04] group hover:border-accent/30 hover:bg-white/[0.04] transition-all duration-300"
-              >
-                <div className="w-12 h-12 rounded-xl bg-background border border-white/[0.04] overflow-hidden shrink-0 flex items-center justify-center">
-                  {ex.mediaUrl ? (
-                    <img src={ex.mediaUrl} alt={ex.name} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted/40">
-                      <Activity size={20} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-text-primary group-hover:text-accent transition-colors truncate">{ex.name}</h4>
-                  <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest mt-0.5">{ex.setCount} Sets · {ex.repMin}-{ex.repMax} Reps</p>
-                </div>
-                <ChevronRight size={16} className="text-text-muted/30 group-hover:text-accent transition-colors" />
-              </div>
-            ))}
+        {/* Sticky Start Workout */}
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background/95 to-transparent z-40 pointer-events-none">
+          <div className="max-w-xl mx-auto pointer-events-auto">
+            <Button
+              variant="primary"
+              fullWidth
+              className="h-16 rounded-2xl font-black text-lg italic tracking-tight shadow-[0_0_30px_rgba(var(--accent-rgb),0.25)]"
+              onClick={startWorkout}
+            >
+              <Play size={22} fill="currentColor" className="mr-2" />
+              Start Workout
+            </Button>
           </div>
         </div>
+
+        {/* Exercise options sheet */}
+        <ExerciseOptionsBottomSheet
+          isOpen={showOptions}
+          onClose={() => setShowOptions(false)}
+          exerciseName={selectedOptionsIdx !== null ? exercises[selectedOptionsIdx]?.name ?? '' : ''}
+          onReplace={() => {
+            setReplaceIdx(selectedOptionsIdx);
+            setShowOptions(false);
+            setShowLibrary(true);
+          }}
+          onRemove={() => {
+            if (selectedOptionsIdx !== null) {
+              setExercises(prev => prev.filter((_, i) => i !== selectedOptionsIdx));
+              setShowOptions(false);
+            }
+          }}
+          onMove={(direction) => {
+            if (selectedOptionsIdx !== null) {
+              if (direction === 'up') handleMoveUp(selectedOptionsIdx);
+              else handleMoveDown(selectedOptionsIdx);
+              setShowOptions(false);
+            }
+          }}
+          onTogglePreference={(pref) => {
+            console.log('Pref toggled:', pref);
+            setShowOptions(false);
+          }}
+        />
+
+        <ExerciseLibrary
+          isOpen={showLibrary}
+          onClose={() => { setShowLibrary(false); setReplaceIdx(null); }}
+          onSelect={handleLibrarySelect}
+        />
       </div>
     );
   }
@@ -582,9 +654,20 @@ export default function WorkoutPage() {
 
   // ── Completed State ─────────────────────────────────────────────────────────────
   if (workoutState === 'completed') {
+    const exerciseList = exercises.map((ex, i) => ({
+      name: ex.name,
+      mediaUrl: ex.mediaUrl,
+      isFocus: i === 0,
+      reps: loggedSets[ex.prescriptionId]?.[0]?.reps,
+      weight: loggedSets[ex.prescriptionId]?.[0]?.weight,
+    }));
+
     return (
       <WorkoutSummary
-        onClose={() => router.push('/dashboard')}
+        onClose={() => setWorkoutState('streak')}
+        onShare={() => {}}
+        workoutName={todayWorkout?.workoutDay?.workoutType || 'Workout'}
+        exerciseList={exerciseList}
         stats={{
           duration: formatTime(elapsedSeconds),
           exercises: exercises.length,
@@ -592,6 +675,64 @@ export default function WorkoutPage() {
           volume: totalVolume
         }}
       />
+    );
+  }
+
+  // ── Streak State ─────────────────────────────────────────────────────────────
+  if (workoutState === 'streak') {
+    const weeklyGoal = 4;
+    const completedThisWeek = 1;
+    const remaining = weeklyGoal - completedThisWeek;
+
+    return (
+      <div className="max-w-xl mx-auto flex flex-col items-center justify-center min-h-[70vh] gap-8 py-12 animate-in fade-in duration-500">
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="self-start text-text-muted hover:text-text-primary transition-colors"
+        >
+          ✕
+        </button>
+
+        <div className="flex flex-col items-center gap-6 text-center flex-1 justify-center">
+          <h2 className="text-4xl font-black italic text-text-primary">Unlock your streak</h2>
+
+          <p className="text-xs font-black text-warning uppercase tracking-[0.2em]">{weeklyGoal} WORKOUTS / WEEK GOAL</p>
+
+          {/* Locked hexagon badge */}
+          <div className="w-20 h-20 rounded-2xl border-2 border-warning/50 bg-warning/5 flex items-center justify-center">
+            <span className="text-warning text-3xl">🔒</span>
+          </div>
+
+          {/* Progress circles */}
+          <div className="flex items-center gap-4">
+            {Array.from({ length: weeklyGoal }, (_, i) => (
+              <div
+                key={i}
+                className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center ${
+                  i < completedThisWeek
+                    ? 'bg-white border-white'
+                    : 'bg-transparent border-white/20'
+                }`}
+              >
+                {i < completedThisWeek && (
+                  <span className="text-background text-sm font-black">✓</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xl font-black italic text-text-primary">
+            {remaining} to go this week
+          </p>
+        </div>
+
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="w-full h-14 rounded-2xl border border-white/20 text-text-primary font-bold hover:border-white/40 transition-colors"
+        >
+          Continue
+        </button>
+      </div>
     );
   }
 

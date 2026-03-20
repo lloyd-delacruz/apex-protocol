@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   Switch,
   Image,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +25,13 @@ import api from '../lib/api';
 import ExercisePicker from '../components/ExercisePicker';
 
 const { width } = Dimensions.get('window');
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SESSION_KEY = 'apex_active_session';
+const TOOLTIP_KEY = 'apex_tooltip_exerciseActions';
+const DEFAULT_SETS = 3;
+const DEFAULT_REST_SEC = 120;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,12 +96,6 @@ interface TodayWorkout {
   } | null;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const SESSION_KEY = 'apex_active_session';
-const DEFAULT_SETS = 3;
-const DEFAULT_REST_SEC = 120; // 2:00
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function calculateStatus(reps: number, repMin: number, repMax: number): TrainingStatus {
@@ -150,6 +152,581 @@ async function loadSession(): Promise<PersistedSession | null> {
 async function clearSession() {
   await AsyncStorage.removeItem(SESSION_KEY);
 }
+
+// ─── HexagonBadge ─────────────────────────────────────────────────────────────
+
+function HexagonBadgeFilled({ size = 32, color = colors.brandPrimary, iconName = 'checkmark', iconColor = '#fff' }: {
+  size?: number;
+  color?: string;
+  iconName?: string;
+  iconColor?: string;
+}) {
+  return (
+    <View style={{
+      width: size,
+      height: size,
+      borderRadius: size * 0.18,
+      backgroundColor: color,
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Ionicons name={iconName as any} size={size * 0.5} color={iconColor} />
+    </View>
+  );
+}
+
+// ─── ExerciseOptionsSheet ─────────────────────────────────────────────────────
+
+function ExerciseOptionsSheet({
+  visible,
+  exercise,
+  onClose,
+  onDelete,
+  onReplace,
+}: {
+  visible: boolean;
+  exercise: WorkoutExercise | null;
+  onClose: () => void;
+  onDelete: () => void;
+  onReplace: () => void;
+}) {
+  const slideAnim = useRef(new Animated.Value(400)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 12,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  if (!visible && !exercise) return null;
+
+  const menuItems = [
+    { icon: 'play-circle-outline', label: 'Video & Instructions', onPress: () => {} },
+    { icon: 'calendar-outline', label: 'Exercise History', onPress: () => {} },
+    { icon: 'swap-horizontal-outline', label: 'Replace', onPress: () => { onClose(); onReplace(); } },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="none">
+      <TouchableOpacity style={sheetStyles.overlay} activeOpacity={1} onPress={onClose}>
+        <Animated.View style={[sheetStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          {/* Drag handle */}
+          <View style={sheetStyles.handle} />
+
+          {/* Header */}
+          <View style={sheetStyles.header}>
+            <Text style={sheetStyles.title} numberOfLines={1}>{exercise?.name ?? ''}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={24} color={colors.brandPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Menu items */}
+          {menuItems.map((item, idx) => (
+            <TouchableOpacity key={idx} style={sheetStyles.menuRow} onPress={item.onPress}>
+              <Ionicons name={item.icon as any} size={22} color={colors.textPrimary} />
+              <Text style={sheetStyles.menuLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+
+          <View style={sheetStyles.divider} />
+
+          {/* Toggle items */}
+          <View style={sheetStyles.menuRow}>
+            <Ionicons name="thumbs-up-outline" size={22} color={colors.textPrimary} />
+            <Text style={sheetStyles.menuLabel}>Recommend more often</Text>
+            <Switch
+              value={false}
+              onValueChange={() => {}}
+              trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(0,194,255,0.3)' }}
+              thumbColor="#555"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+            />
+          </View>
+          <View style={sheetStyles.menuRow}>
+            <Ionicons name="thumbs-down-outline" size={22} color={colors.textPrimary} />
+            <Text style={sheetStyles.menuLabel}>Recommend less often</Text>
+            <Switch
+              value={false}
+              onValueChange={() => {}}
+              trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(0,194,255,0.3)' }}
+              thumbColor="#555"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+            />
+          </View>
+
+          <View style={sheetStyles.divider} />
+
+          <TouchableOpacity style={sheetStyles.menuRow} onPress={() => {}}>
+            <Ionicons name="ban-outline" size={22} color={colors.textPrimary} />
+            <Text style={sheetStyles.menuLabel}>Don't recommend again</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <View style={sheetStyles.divider} />
+
+          <TouchableOpacity style={sheetStyles.menuRow} onPress={() => { onClose(); onDelete(); }}>
+            <Ionicons name="trash-outline" size={22} color={colors.danger} />
+            <Text style={[sheetStyles.menuLabel, { color: colors.danger }]}>Delete from workout</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <View style={{ height: 30 }} />
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#111118',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: 12 },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  menuLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: colors.textPrimary },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 4 },
+});
+
+// ─── ExerciseTooltip ──────────────────────────────────────────────────────────
+
+function ExerciseTooltip({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  if (!visible) return null;
+  return (
+    <View style={tooltipStyles.container}>
+      <View style={tooltipStyles.box}>
+        <View style={tooltipStyles.arrowUp} />
+        <Text style={tooltipStyles.title}>EXERCISE ACTIONS</Text>
+        <Text style={tooltipStyles.body}>Hit this to replace or delete exercises.</Text>
+        <TouchableOpacity style={tooltipStyles.btn} onPress={onDismiss}>
+          <Text style={tooltipStyles.btnText}>Got it</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const tooltipStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    zIndex: 999,
+  },
+  arrowUp: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#1E1E30',
+    alignSelf: 'flex-end',
+    marginRight: 12,
+    marginBottom: -1,
+  },
+  box: {
+    backgroundColor: '#1E1E30',
+    borderRadius: 12,
+    padding: 16,
+    width: 220,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  title: { fontSize: 11, fontWeight: '800', color: colors.brandPrimary, letterSpacing: 1.5, marginBottom: 6 },
+  body: { fontSize: 14, color: colors.textPrimary, lineHeight: 20, marginBottom: 12 },
+  btn: { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.brandPrimary },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+});
+
+// ─── ConfettiParticles ────────────────────────────────────────────────────────
+
+function ConfettiParticles() {
+  const particles = useRef(
+    Array.from({ length: 20 }, (_, i) => ({
+      x: new Animated.Value(Math.random() * width),
+      y: new Animated.Value(-20),
+      opacity: new Animated.Value(1),
+      color: [colors.brandPrimary, colors.warning, colors.success, colors.danger, '#A855F7'][i % 5],
+      size: 6 + Math.random() * 8,
+    }))
+  ).current;
+
+  useEffect(() => {
+    particles.forEach((p, i) => {
+      const delay = i * 80;
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(p.y, { toValue: 400 + Math.random() * 200, duration: 1500 + Math.random() * 1000, useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0, duration: 1500 + Math.random() * 1000, useNativeDriver: true }),
+        ]),
+      ]).start();
+    });
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: p.x,
+            transform: [{ translateY: p.y }],
+            opacity: p.opacity,
+            width: p.size,
+            height: p.size,
+            borderRadius: p.size / 2,
+            backgroundColor: p.color,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── StreakScreen ─────────────────────────────────────────────────────────────
+
+function StreakScreen({ onContinue }: { onContinue: () => void }) {
+  return (
+    <View style={streakStyles.container}>
+      <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={streakStyles.inner}>
+        <TouchableOpacity style={streakStyles.closeBtn} onPress={onContinue}>
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+
+        <View style={streakStyles.content}>
+          <Text style={streakStyles.title}><Text style={{ fontStyle: 'italic' }}>Unlock your streak</Text></Text>
+          <Text style={streakStyles.goalText}>4 WORKOUTS / WEEK GOAL</Text>
+
+          {/* Large locked hexagon */}
+          <View style={streakStyles.lockedHex}>
+            <Ionicons name="lock-closed" size={40} color={colors.warning} />
+          </View>
+
+          {/* 4 progress hexagons */}
+          <View style={streakStyles.hexRow}>
+            <View style={[streakStyles.hexProgress, streakStyles.hexDone]}>
+              <Ionicons name="checkmark" size={18} color="#0A0A0F" />
+            </View>
+            {[1, 2, 3].map(i => (
+              <View key={i} style={streakStyles.hexProgress} />
+            ))}
+          </View>
+
+          <Text style={streakStyles.goText}><Text style={{ fontStyle: 'italic' }}>3 to go this week</Text></Text>
+        </View>
+
+        <TouchableOpacity style={streakStyles.continueBtn} onPress={onContinue}>
+          <Text style={streakStyles.continueBtnText}>Continue</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const streakStyles = StyleSheet.create({
+  container: { flex: 1 },
+  inner: { flex: 1, paddingHorizontal: 24 },
+  closeBtn: { marginTop: 8, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
+  title: { fontSize: 32, fontWeight: '900', color: colors.textPrimary, textAlign: 'center' },
+  goalText: { fontSize: 13, fontWeight: '700', color: colors.warning, letterSpacing: 1.5, textTransform: 'uppercase' },
+  lockedHex: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: colors.warning,
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+  },
+  hexRow: { flexDirection: 'row', gap: 12 },
+  hexProgress: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hexDone: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  goText: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+  continueBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.textPrimary,
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  continueBtnText: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
+});
+
+// ─── WorkoutCompleteScreen ────────────────────────────────────────────────────
+
+function WorkoutCompleteScreen({
+  exercises,
+  loggedSets,
+  elapsedSec,
+  onShare,
+  onDone,
+}: {
+  exercises: WorkoutExercise[];
+  loggedSets: Record<string, LoggedSet[]>;
+  elapsedSec: number;
+  onShare: () => void;
+  onDone: () => void;
+}) {
+  const totalVolume = useMemo(() => {
+    let v = 0;
+    Object.values(loggedSets).forEach(sets => sets.forEach(s => {
+      const w = parseFloat(s.weight); const r = parseInt(s.reps, 10);
+      if (!isNaN(w) && !isNaN(r)) v += w * r;
+    }));
+    return v;
+  }, [loggedSets]);
+
+  const cals = Math.floor(elapsedSec / 12);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
+      <ConfettiParticles />
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={completeStyles.scroll}>
+          {/* Top bar */}
+          <View style={completeStyles.topBar}>
+            <Text style={completeStyles.dateText}>{dateStr} · {timeStr}</Text>
+            <View style={completeStyles.topActions}>
+              <TouchableOpacity onPress={onShare} style={completeStyles.topBtn}>
+                <Ionicons name="share-outline" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={completeStyles.topBtn}>
+                <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Center muscle icon */}
+          <View style={completeStyles.iconBadge}>
+            <Ionicons name="body" size={52} color={colors.brandPrimary} />
+          </View>
+
+          {/* Workout name & duration */}
+          <Text style={completeStyles.workoutName}>
+            <Text style={{ fontStyle: 'italic' }}>Workout Complete</Text>
+          </Text>
+          <Text style={completeStyles.duration}>{fmtTime(elapsedSec)}</Text>
+
+          {/* Stats row */}
+          <View style={completeStyles.statsRow}>
+            <View style={completeStyles.statCell}>
+              <Text style={completeStyles.statLabel}>CALORIES</Text>
+              <Text style={completeStyles.statValue}>{cals}</Text>
+            </View>
+            <View style={completeStyles.statDivider} />
+            <View style={completeStyles.statCell}>
+              <Text style={completeStyles.statLabel}>VOLUME</Text>
+              <Text style={completeStyles.statValue}>{totalVolume.toLocaleString()} lb</Text>
+            </View>
+          </View>
+
+          {/* Exercise section */}
+          <Text style={completeStyles.sectionTitle}>
+            {exercises.length} {exercises.length === 1 ? 'Exercise' : 'Exercises'}
+          </Text>
+
+          {exercises.map((ex, idx) => {
+            const sets = loggedSets[ex.id] ?? [];
+            const lastSet = sets[sets.length - 1];
+            const repsStr = lastSet ? `${lastSet.reps} reps` : `${ex.repMin} reps`;
+            const weightStr = lastSet ? `x ${lastSet.weight} lb` : `x ${ex.suggestedWeight} lb`;
+
+            return (
+              <View key={ex.id} style={completeStyles.exRow}>
+                <View style={completeStyles.exThumb}>
+                  {ex.mediaUrl ? (
+                    <Image source={{ uri: ex.mediaUrl }} style={completeStyles.exThumbImg} />
+                  ) : (
+                    <View style={completeStyles.exThumbPlaceholder}>
+                      <Ionicons name="barbell-outline" size={20} color={colors.textMuted} />
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  {idx === 0 && <Text style={completeStyles.focusLabel}>FOCUS EXERCISE</Text>}
+                  <Text style={completeStyles.exName}>{ex.name}</Text>
+                  <Text style={completeStyles.exMeta}>{repsStr} {weightStr}</Text>
+                </View>
+                <HexagonBadgeFilled size={32} color={colors.success} iconName="checkmark" iconColor="#fff" />
+              </View>
+            );
+          })}
+
+          <View style={{ height: 120 }} />
+        </ScrollView>
+
+        {/* Bottom actions */}
+        <View style={completeStyles.bottomActions}>
+          <TouchableOpacity style={completeStyles.shareBtn} onPress={onShare}>
+            <Text style={completeStyles.shareBtnText}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={completeStyles.doneBtn} onPress={onDone}>
+            <Text style={completeStyles.doneBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const completeStyles = StyleSheet.create({
+  scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
+  dateText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  topActions: { flexDirection: 'row', gap: 12 },
+  topBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,194,255,0.08)',
+    borderWidth: 2,
+    borderColor: 'rgba(0,194,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  workoutName: { fontSize: 30, fontWeight: '900', color: colors.textPrimary, textAlign: 'center', marginBottom: 6 },
+  duration: { fontSize: 18, color: colors.textMuted, fontWeight: '600', textAlign: 'center', marginBottom: 24 },
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 28,
+    overflow: 'hidden',
+  },
+  statCell: { flex: 1, alignItems: 'center', paddingVertical: 18 },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  statLabel: { fontSize: 10, fontWeight: '700', color: colors.textMuted, letterSpacing: 1.5, marginBottom: 6 },
+  statValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 16 },
+  exRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  exThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  exThumbImg: { width: '100%', height: '100%' },
+  exThumbPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  focusLabel: { fontSize: 10, fontWeight: '800', color: colors.warning, letterSpacing: 1.2, marginBottom: 2 },
+  exName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  exMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  bottomActions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 36,
+    backgroundColor: '#0A0A0F',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
+  },
+  shareBtn: {
+    flex: 1,
+    paddingVertical: 18,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+  },
+  shareBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: 16 },
+  doneBtn: {
+    flex: 1.5,
+    paddingVertical: 18,
+    borderRadius: 14,
+    backgroundColor: colors.brandPrimary,
+    alignItems: 'center',
+  },
+  doneBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+});
 
 // ─── SetInputRow ──────────────────────────────────────────────────────────────
 
@@ -215,8 +792,6 @@ function SetInputRow({
           placeholderTextColor="rgba(255,255,255,0.2)"
         />
       </View>
-
-      {/* Log button (only for unlogged sets, triggered by parent) */}
     </View>
   );
 }
@@ -312,13 +887,7 @@ function RestTimerSheet({
 }
 
 const restStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
+  container: { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100 },
   sheet: {
     backgroundColor: '#1C1C28',
     borderTopLeftRadius: 24,
@@ -329,20 +898,9 @@ const restStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  timerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 40,
-    marginBottom: 24,
-  },
+  timerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40, marginBottom: 24 },
   adjustBtn: { alignItems: 'center', gap: 4 },
   adjustLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
   time: { fontSize: 64, fontWeight: '900', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
@@ -387,18 +945,15 @@ function FinishModal({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={finishStyles.overlay}>
-        {/* Top area — shows workout behind */}
         <View style={finishStyles.topFade}>
           <TouchableOpacity style={finishStyles.closeTop} onPress={onResume}>
             <Ionicons name="close" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={finishStyles.elapsedTime}>{fmtTime(elapsed)}</Text>
 
-          {/* Exercise summary cards */}
           <ScrollView style={finishStyles.exerciseScroll} showsVerticalScrollIndicator={false}>
             {exercises.map(ex => {
               const sets = loggedSets[ex.id] ?? [];
-              const restSec = 33; // placeholder
               return (
                 <View key={ex.id} style={finishStyles.exCard}>
                   <View style={finishStyles.exThumb}>
@@ -414,7 +969,6 @@ function FinishModal({
                     <Text style={finishStyles.focusLabel}>FOCUS EXERCISE</Text>
                     <Text style={finishStyles.exName}>{ex.name}</Text>
                     <Text style={finishStyles.exMeta}>{sets.length}/{ex.sets} logged</Text>
-                    <Text style={finishStyles.exRest}>⏱ 00:{restSec.toString().padStart(2, '0')} Rest</Text>
                   </View>
                   <TouchableOpacity>
                     <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
@@ -425,7 +979,6 @@ function FinishModal({
           </ScrollView>
         </View>
 
-        {/* Bottom panel */}
         <View style={finishStyles.bottomPanel}>
           <View style={finishStyles.accentLine} />
 
@@ -436,7 +989,6 @@ function FinishModal({
             </TouchableOpacity>
           </View>
 
-          {/* Stats grid */}
           <View style={finishStyles.statsRow}>
             <View style={finishStyles.statCell}>
               <Text style={finishStyles.statLabel}>DURATION</Text>
@@ -456,7 +1008,6 @@ function FinishModal({
             </View>
           </View>
 
-          {/* Sync toggles */}
           <View style={finishStyles.syncSection}>
             <View style={finishStyles.syncRow}>
               <Ionicons name="heart" size={20} color="#FF2D55" />
@@ -490,7 +1041,6 @@ function FinishModal({
             </View>
           </View>
 
-          {/* Action buttons */}
           <View style={finishStyles.actions}>
             <TouchableOpacity style={finishStyles.resumeBtn} onPress={onResume}>
               <Text style={finishStyles.resumeBtnText}>Resume</Text>
@@ -518,7 +1068,6 @@ const finishStyles = StyleSheet.create({
   focusLabel: { fontSize: 10, fontWeight: '800', color: colors.brandPrimary, letterSpacing: 1 },
   exName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   exMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  exRest: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   bottomPanel: {
     backgroundColor: '#111118',
     borderTopLeftRadius: 24,
@@ -544,9 +1093,11 @@ const finishStyles = StyleSheet.create({
   logBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── WorkoutState type ────────────────────────────────────────────────────────
 
-type WorkoutState = 'loading' | 'idle' | 'active' | 'saving' | 'completed' | 'error' | 'rest' | 'no-program';
+type WorkoutState = 'loading' | 'idle' | 'active' | 'saving' | 'completed' | 'streak' | 'error' | 'rest' | 'no-program';
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function WorkoutScreen() {
   const [screenState, setScreenState] = useState<WorkoutState>('loading');
@@ -564,7 +1115,7 @@ export default function WorkoutScreen() {
   const [restPaused, setRestPaused] = useState(false);
   const [restDuration, setRestDuration] = useState(DEFAULT_REST_SEC);
 
-  // Set type toggle per exercise
+  // Set type toggle
   const [setTabMode, setSetTabMode] = useState<'working' | 'warmup'>('working');
 
   // Exercise picker
@@ -573,8 +1124,27 @@ export default function WorkoutScreen() {
   // Finish modal
   const [showFinishModal, setShowFinishModal] = useState(false);
 
+  // Exercise options sheet
+  const [optionsExercise, setOptionsExercise] = useState<WorkoutExercise | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
+
+  // Tooltip
+  const [showTooltip, setShowTooltip] = useState(false);
+
   // Sync
   const [syncPrefs, setSyncPrefs] = useState({ appleHealth: false, strava: false, fitbit: false });
+
+  // Check tooltip on mount
+  useEffect(() => {
+    AsyncStorage.getItem(TOOLTIP_KEY).then(val => {
+      if (!val) setShowTooltip(true);
+    });
+  }, []);
+
+  const dismissTooltip = async () => {
+    await AsyncStorage.setItem(TOOLTIP_KEY, 'dismissed');
+    setShowTooltip(false);
+  };
 
   // ── Elapsed timer ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -595,7 +1165,6 @@ export default function WorkoutScreen() {
     return () => clearInterval(iv);
   }, [restTimeLeft, restPaused]);
 
-  // Auto-dismiss rest when done
   useEffect(() => {
     if (restTimeLeft === 0) setRestTimeLeft(null);
   }, [restTimeLeft]);
@@ -700,17 +1269,11 @@ export default function WorkoutScreen() {
         const existing = prev[exId] ?? [];
         return { ...prev, [exId]: [...existing.filter(s => s.setNumber !== setNum), { setNumber: setNum, ...data, status }] };
       });
-      // Start rest timer
       setRestTimeLeft(restDuration);
       setRestPaused(false);
     } catch (err: any) {
       Alert.alert('Log Failed', err.message);
     }
-  }
-
-  function logAllSets(ex: WorkoutExercise) {
-    // Collect refs from set inputs — for now, log with default values
-    Alert.alert('Log All Sets', 'This will log all sets with the current values.');
   }
 
   async function submitWorkout() {
@@ -747,16 +1310,16 @@ export default function WorkoutScreen() {
     }
   }
 
-  const totalPrescribed = exercises.reduce((s, e) => s + e.sets, 0);
   const totalLogged = Object.values(loggedSets).flat().length;
   const workoutName = workout?.workoutDay?.workoutType ?? 'Workout';
   const phaseText = workout?.workoutDay?.phase ?? '';
   const weekNum = workout?.currentWeek?.absoluteWeekNumber ?? 1;
+  const totalMuscles = [...new Set(exercises.map(e => e.muscle).filter(Boolean))].length;
 
   const Background = () => <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />;
 
   // ═══ Loading ═══════════════════════════════════════════════════════════════
-  if (screenState === 'loading') {
+  if (screenState === 'loading' || screenState === 'saving') {
     return (
       <View style={ms.container}><Background />
         <SafeAreaView style={ms.centeredState}>
@@ -792,9 +1355,6 @@ export default function WorkoutScreen() {
           <TouchableOpacity style={ms.primaryBtn} onPress={() => setShowExercisePicker(true)}>
             <Text style={ms.primaryBtnText}>QUICK WORKOUT</Text>
           </TouchableOpacity>
-          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 12, textAlign: 'center' }}>
-            Or pick exercises for a quick session
-          </Text>
         </SafeAreaView>
         <ExercisePicker
           visible={showExercisePicker}
@@ -805,9 +1365,7 @@ export default function WorkoutScreen() {
               muscle: ex.bodyPart, sets: DEFAULT_SETS, repMin: 8, repMax: 12,
               rirTarget: 2, suggestedWeight: 0, mediaUrl: ex.mediaUrl,
             }]);
-            if (exercises.length === 0) {
-              setScreenState('idle');
-            }
+            if (exercises.length === 0) setScreenState('idle');
           }}
         />
       </View>
@@ -827,60 +1385,166 @@ export default function WorkoutScreen() {
     );
   }
 
-  // ═══ Completed ══════════════════════════════════════════════════════════════
-  if (screenState === 'completed') {
+  // ═══ Streak Screen ══════════════════════════════════════════════════════════
+  if (screenState === 'streak') {
     return (
-      <View style={ms.container}><Background />
-        <SafeAreaView style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={ms.summaryScroll}>
-            <View style={ms.completeBadge}><Text style={{ fontSize: 40 }}>⚡</Text></View>
-            <Text style={ms.completeTitle}>PROTOCOL{'\n'}<Text style={ms.italic}>COMPLETE</Text></Text>
-            <View style={ms.summaryGrid}>
-              <View style={ms.summaryBox}><Text style={ms.summaryVal}>{fmtTime(elapsedSec)}</Text><Text style={ms.summaryLabel}>Time</Text></View>
-              <View style={ms.summaryBox}><Text style={ms.summaryVal}>{exercises.length}</Text><Text style={ms.summaryLabel}>Exercises</Text></View>
-              <View style={ms.summaryBox}><Text style={ms.summaryVal}>{totalLogged}</Text><Text style={ms.summaryLabel}>Sets</Text></View>
-            </View>
-            <TouchableOpacity style={ms.primaryBtn} onPress={() => { setScreenState('idle'); loadWorkout(); }}>
-              <Text style={ms.primaryBtnText}>RETURN HOME</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
+      <StreakScreen
+        onContinue={() => {
+          setScreenState('idle');
+          loadWorkout();
+        }}
+      />
     );
   }
 
-  // ═══ Idle (Preview) ════════════════════════════════════════════════════════
+  // ═══ Completed ══════════════════════════════════════════════════════════════
+  if (screenState === 'completed') {
+    return (
+      <WorkoutCompleteScreen
+        exercises={exercises}
+        loggedSets={loggedSets}
+        elapsedSec={elapsedSec}
+        onShare={() => Alert.alert('Share', 'Sharing coming soon!')}
+        onDone={() => setScreenState('streak')}
+      />
+    );
+  }
+
+  // ═══ Idle (Preview / Day Overview) ════════════════════════════════════════
   if (screenState === 'idle') {
     return (
-      <View style={ms.container}><Background />
+      <View style={ms.container}>
+        <Background />
         <SafeAreaView style={{ flex: 1 }}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ms.scroll}>
-            <Text style={ms.pageTitle}>Today's{'\n'}<Text style={ms.italic}>Protocol</Text></Text>
-            <View style={ms.previewCard}>
-              <View style={ms.previewHeaderRow}>
-                <Text style={ms.workoutName}>{workoutName}</Text>
-                <TouchableOpacity onPress={() => setShowExercisePicker(true)}>
-                  <Ionicons name="add-circle-outline" size={28} color={colors.brandPrimary} />
-                </TouchableOpacity>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={ms.idleScroll}
+          >
+            {/* Top breadcrumb */}
+            <View style={ms.breadcrumb}>
+              <View style={ms.avatarCircle}>
+                <Text style={ms.avatarText}>LD</Text>
               </View>
-              <Text style={ms.workoutMeta}>Week {weekNum} · {exercises.length} exercises</Text>
+              <TouchableOpacity style={ms.breadcrumbPill}>
+                <Text style={ms.breadcrumbText}>My Plan </Text>
+                <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
 
+            {/* Workout title row */}
+            <View style={ms.workoutTitleRow}>
+              <Text style={ms.workoutTitle}><Text style={{ fontStyle: 'italic', fontWeight: '900' }}>{workoutName}</Text></Text>
+              <TouchableOpacity style={ms.swapPill}>
+                <Ionicons name="swap-horizontal" size={14} color={colors.textMuted} />
+                <Text style={ms.swapText}> Swap</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ms.dotBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={ms.workoutSubtitle}>
+              {exercises.length} {exercises.length === 1 ? 'Exercise' : 'Exercises'} · {totalMuscles || 1} {totalMuscles === 1 ? 'Muscle' : 'Muscles'}
+            </Text>
+
+            {/* Filter chips */}
+            <View style={ms.filterRow}>
+              <TouchableOpacity style={ms.filterChip}>
+                <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                <Text style={ms.filterChipText}> 1h 15m</Text>
+                <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={ms.filterChip}>
+                <Text style={ms.filterChipText}>Equipment</Text>
+                <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Exercise list */}
+            <View style={ms.exerciseList}>
               {exercises.map((ex, idx) => (
-                <View key={ex.id} style={ms.previewRow}>
-                  <View style={ms.previewIndex}><Text style={ms.previewIndexText}>{idx + 1}</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={ms.previewName}>{ex.name}</Text>
-                    <Text style={ms.previewSub}>{ex.sets} sets · {ex.repMin}-{ex.repMax} reps</Text>
+                <View key={ex.id} style={ms.exListItem}>
+                  {/* Vertical connector line */}
+                  {idx < exercises.length - 1 && <View style={ms.connectorLine} />}
+
+                  {/* Exercise row */}
+                  <View style={ms.exRow}>
+                    {/* Split thumbnail */}
+                    <View style={ms.exSplitThumb}>
+                      {ex.mediaUrl ? (
+                        <Image source={{ uri: ex.mediaUrl }} style={ms.exSplitThumbLeft} resizeMode="cover" />
+                      ) : (
+                        <View style={[ms.exSplitThumbLeft, ms.exThumbPlaceholder]}>
+                          <Ionicons name="barbell-outline" size={16} color={colors.textMuted} />
+                        </View>
+                      )}
+                      {/* Right half: muscle silhouette placeholder */}
+                      <View style={ms.exSplitThumbRight}>
+                        <Ionicons name="body-outline" size={20} color="rgba(255,255,255,0.2)" />
+                      </View>
+                    </View>
+
+                    {/* Exercise info */}
+                    <View style={{ flex: 1 }}>
+                      {idx === 0 && (
+                        <Text style={ms.focusLabel}>FOCUS EXERCISE</Text>
+                      )}
+                      <Text style={ms.exName}>{ex.name}</Text>
+                      <Text style={ms.exMeta}>
+                        {ex.sets} sets · {ex.repMin}{ex.repMax !== ex.repMin ? `-${ex.repMax}` : ''} reps
+                        {ex.suggestedWeight > 0 ? ` · ${ex.suggestedWeight} lb` : ''}
+                      </Text>
+                    </View>
+
+                    {/* Options button + tooltip anchor */}
+                    <View>
+                      <TouchableOpacity
+                        style={ms.exOptionsBtn}
+                        onPress={() => { setOptionsExercise(ex); setShowOptions(true); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+                      </TouchableOpacity>
+                      {idx === 0 && showTooltip && (
+                        <ExerciseTooltip visible={showTooltip} onDismiss={dismissTooltip} />
+                      )}
+                    </View>
                   </View>
                 </View>
               ))}
 
-              <TouchableOpacity style={ms.primaryBtn} onPress={startWorkout}>
-                <Text style={ms.primaryBtnText}>IGNITE PROTOCOL</Text>
+              {/* Add Exercise */}
+              <TouchableOpacity style={ms.addExerciseRow} onPress={() => setShowExercisePicker(true)}>
+                <View style={ms.addExerciseIcon}>
+                  <Ionicons name="add" size={20} color={colors.brandPrimary} />
+                </View>
+                <Text style={ms.addExerciseText}>Add Exercise</Text>
               </TouchableOpacity>
             </View>
+
+            <View style={{ height: 100 }} />
           </ScrollView>
+
+          {/* Start Workout CTA */}
+          <View style={ms.idleBottomBar}>
+            <TouchableOpacity style={ms.startWorkoutBtn} onPress={startWorkout}>
+              <Text style={ms.startWorkoutBtnText}>Start Workout</Text>
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
+
+        {/* Exercise options sheet */}
+        <ExerciseOptionsSheet
+          visible={showOptions}
+          exercise={optionsExercise}
+          onClose={() => setShowOptions(false)}
+          onDelete={() => {
+            if (optionsExercise) {
+              setExercises(prev => prev.filter(e => e.id !== optionsExercise.id));
+            }
+          }}
+          onReplace={() => setShowExercisePicker(true)}
+        />
 
         <ExercisePicker
           visible={showExercisePicker}
@@ -903,7 +1567,6 @@ export default function WorkoutScreen() {
   const currentLogged = loggedSets[currentEx?.id] ?? [];
   const currentComplete = currentLogged.length >= (currentEx?.sets ?? 0);
 
-
   return (
     <View style={ms.container}>
       <Background />
@@ -920,7 +1583,6 @@ export default function WorkoutScreen() {
             </View>
           )}
 
-          {/* Gradient overlay + exercise name */}
           <LinearGradient
             colors={['transparent', 'rgba(10,10,15,0.85)']}
             style={ms.exHeaderGradient}
@@ -1032,9 +1694,6 @@ export default function WorkoutScreen() {
                   loggedSet={log}
                   onLog={() => {}}
                 />
-                {log && si === 0 && (
-                  <Text style={ms.barPlates}>Bar + Plates</Text>
-                )}
               </View>
             );
           })}
@@ -1066,7 +1725,6 @@ export default function WorkoutScreen() {
               if (!currentEx) return;
               const nextUnlogged = Array.from({ length: currentEx.sets }).findIndex((_, i) => !currentLogged.find(s => s.setNumber === i + 1));
               if (nextUnlogged === -1) {
-                // All sets done — move to next exercise
                 if (expandedIdx < exercises.length - 1) setExpandedIdx(expandedIdx + 1);
                 return;
               }
@@ -1135,29 +1793,148 @@ const ms = StyleSheet.create({
   retryBtnText: { color: '#fff', fontWeight: '900' },
   restDayTitle: { fontSize: 28, fontWeight: '800', color: colors.textPrimary },
   restDaySub: { fontSize: 16, color: colors.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 24 },
-  scroll: { paddingHorizontal: 16, paddingBottom: 24 },
-  pageTitle: { fontSize: 36, fontWeight: '800', color: colors.textPrimary, marginTop: 20, marginBottom: 20 },
-  italic: { fontStyle: 'italic', fontWeight: '900' },
-  previewCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 20 },
-  previewHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  workoutName: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  workoutMeta: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: 20 },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  previewIndex: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
-  previewIndexText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  previewName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  previewSub: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  primaryBtn: { backgroundColor: colors.brandPrimary, paddingVertical: 18, borderRadius: 14, alignItems: 'center', marginTop: 24 },
+  primaryBtn: { backgroundColor: colors.brandPrimary, paddingVertical: 18, borderRadius: 14, alignItems: 'center', marginTop: 24, paddingHorizontal: 32 },
   primaryBtnText: { color: '#fff', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
-  summaryScroll: { padding: 24, alignItems: 'center', paddingTop: 60 },
-  completeBadge: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(0, 194, 255, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 30 },
-  completeTitle: { fontSize: 40, fontWeight: '900', color: colors.textPrimary, textAlign: 'center', marginBottom: 40 },
-  summaryGrid: { flexDirection: 'row', gap: 12, marginBottom: 40, width: '100%' },
-  summaryBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  summaryVal: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
-  summaryLabel: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
 
-  // Active workout
+  // ── Idle state ──
+  idleScroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  avatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.brandPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  breadcrumbPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 20,
+  },
+  breadcrumbText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+
+  workoutTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  workoutTitle: { fontSize: 24, fontWeight: '900', color: colors.textPrimary, flex: 1 },
+  swapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20,
+  },
+  swapText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  dotBtn: { padding: 4 },
+
+  workoutSubtitle: { fontSize: 14, color: colors.textMuted, marginBottom: 12 },
+
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20,
+    gap: 4,
+  },
+  filterChipText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+
+  exerciseList: { gap: 0 },
+  exListItem: { position: 'relative' },
+  connectorLine: {
+    position: 'absolute',
+    left: 30,
+    top: 72,
+    bottom: -4,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    zIndex: 0,
+  },
+  exRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  exSplitThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  exSplitThumbLeft: { width: '50%', height: '100%' },
+  exSplitThumbRight: {
+    width: '50%',
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exThumbPlaceholder: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusLabel: { fontSize: 10, fontWeight: '800', color: colors.warning, letterSpacing: 1.2, marginBottom: 2 },
+  exName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  exMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  exOptionsBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addExerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  addExerciseIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.brandPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderStyle: 'dashed',
+  },
+  addExerciseText: { fontSize: 15, fontWeight: '700', color: colors.brandPrimary },
+
+  idleBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 36,
+    backgroundColor: '#0A0A0F',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  startWorkoutBtn: {
+    backgroundColor: colors.brandPrimary,
+    paddingVertical: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  startWorkoutBtnText: { color: '#fff', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+
+  // ── Active workout ──
   exDetailHeader: { height: 220, backgroundColor: '#0E0E18', position: 'relative' },
   exImage: { width: '100%', height: '100%' },
   exImagePlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0E0E18' },
@@ -1189,7 +1966,7 @@ const ms = StyleSheet.create({
 
   phaseInfo: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, gap: 14 },
   phaseIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center' },
-  phaseTitle: { fontSize: 15, fontWeight: '700', color: colors.brandPrimary },
+  phaseTitle: { fontSize: 15, fontWeight: '700', color: colors.warning },
   phaseSub: { fontSize: 13, color: colors.textMuted, marginTop: 4, lineHeight: 18 },
   adjustNote: { paddingHorizontal: 20, paddingBottom: 16, fontSize: 13, color: colors.textMuted },
 
@@ -1197,7 +1974,6 @@ const ms = StyleSheet.create({
   setHeaderLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
 
   setRowContainer: { paddingHorizontal: 20 },
-  barPlates: { fontSize: 12, color: colors.textMuted, textAlign: 'right', marginTop: -6, marginBottom: 8 },
 
   addSetRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
   addSetIcon: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: colors.brandPrimary, alignItems: 'center', justifyContent: 'center' },

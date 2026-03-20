@@ -5,9 +5,10 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import HomeScreen from '../screens/HomeScreen';
 import WorkoutScreen from '../screens/WorkoutScreen';
-import ProgressScreen from '../screens/ProgressScreen';
+import BodyScreen from '../screens/BodyScreen';
+import TargetsScreen from '../screens/TargetsScreen';
+import LogScreen from '../screens/LogScreen';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 
@@ -15,7 +16,6 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
 
 // ─── Main tab navigator ───────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ function MainTabs() {
           paddingTop: 8,
           height: 64,
         },
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: colors.brandPrimary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -42,13 +42,6 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
         name="Workout"
         component={WorkoutScreen}
         options={{
@@ -56,21 +49,35 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Progress"
-        component={ProgressScreen}
+        name="Body"
+        component={BodyScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="body-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Targets"
+        component={TargetsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Log"
+        component={LogScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-// ─── Root navigator ───────────────────────────────────────────────────────────
-
 // ─── Dev Mode ─────────────────────────────────────────────────────────────────
 // Set to true to bypass login & onboarding during development
 const DEV_MODE = false;
+
+// ─── Root navigator ───────────────────────────────────────────────────────────
 
 export default function AppNavigator() {
   const { user, loading, onboardingComplete, loginDev, setOnboardingComplete } = useAuth();
@@ -90,7 +97,7 @@ export default function AppNavigator() {
         <View style={styles.loadingBadge}>
           <Text style={styles.loadingBadgeText}>AP</Text>
         </View>
-        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 24 }} />
+        <ActivityIndicator size="large" color={colors.brandPrimary} style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -130,7 +137,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 16,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brandPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },

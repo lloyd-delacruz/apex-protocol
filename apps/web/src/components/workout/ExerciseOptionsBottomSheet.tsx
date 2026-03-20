@@ -1,19 +1,7 @@
 'use client';
 
-import React from 'react';
-import { 
-  X, 
-  RefreshCw, 
-  Trash2, 
-  ArrowUp, 
-  ArrowDown, 
-  Info,
-  Heart,
-  Ban,
-  ChevronRight,
-  Minus
-} from 'lucide-react';
-import Button from '@/components/ui/Button';
+import React, { useState } from 'react';
+import { X, Play, Calendar, RefreshCw, ArrowUp, ArrowDown, Ban, Trash2, ChevronRight } from 'lucide-react';
 
 interface ExerciseOptionsBottomSheetProps {
   isOpen: boolean;
@@ -31,116 +19,108 @@ export default function ExerciseOptionsBottomSheet({
   exerciseName,
   onReplace,
   onRemove,
-  onMove,
   onTogglePreference
 }: ExerciseOptionsBottomSheetProps) {
+  const [recommendMore, setRecommendMore] = useState(false);
+  const [recommendLess, setRecommendLess] = useState(false);
+
   if (!isOpen) return null;
 
+  const menuRows = [
+    {
+      icon: <Play size={20} />,
+      label: 'Video & Instructions',
+      action: () => {},
+      showChevron: true,
+    },
+    {
+      icon: <Calendar size={20} />,
+      label: 'Exercise History',
+      action: () => {},
+      showChevron: true,
+    },
+    {
+      icon: <RefreshCw size={20} />,
+      label: 'Replace',
+      action: onReplace,
+      showChevron: true,
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[140] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div 
-        className="w-full max-w-lg bg-surface border-t border-white/[0.08] rounded-t-[32px] flex flex-col p-6 pb-10 shadow-2xl animate-in slide-in-from-bottom duration-300"
+    <div
+      className="fixed inset-0 z-[140] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-[#111118] border-t border-white/[0.08] rounded-t-[28px] flex flex-col pb-10 shadow-2xl animate-in slide-in-from-bottom duration-300"
+        onClick={e => e.stopPropagation()}
       >
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
+        {/* Drag handle */}
+        <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mt-3 mb-4" />
 
-        <div className="flex items-center justify-between mb-8">
-           <h3 className="text-xl font-black text-text-primary uppercase tracking-tight italic">
-              Exercise Options
-           </h3>
-           <button 
-             onClick={onClose}
-             className="w-10 h-10 rounded-full bg-white/[0.04] flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
-           >
-             <X size={20} />
-           </button>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pb-4 border-b border-white/[0.06]">
+          <h3 className="text-base font-bold text-text-primary truncate flex-1 mr-4">{exerciseName}</h3>
+          <button onClick={onClose} className="text-accent hover:opacity-80 transition-opacity">
+            <X size={22} />
+          </button>
         </div>
 
-        <div className="mb-8">
-           <p className="text-xs font-bold text-text-muted uppercase tracking-[0.2em] mb-2">Selected Exercise</p>
-           <h4 className="text-lg font-black text-accent uppercase tracking-tight">{exerciseName}</h4>
+        {/* Menu rows */}
+        {menuRows.map((row, i) => (
+          <button
+            key={i}
+            onClick={row.action}
+            className="flex items-center gap-4 px-6 py-4 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-left"
+          >
+            <span className="text-text-primary">{row.icon}</span>
+            <span className="flex-1 text-sm font-medium text-text-primary">{row.label}</span>
+            {row.showChevron && <ChevronRight size={16} className="text-text-muted" />}
+          </button>
+        ))}
+
+        {/* Recommend more often */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-white/[0.04]">
+          <span className="text-text-primary"><ArrowUp size={20} /></span>
+          <span className="flex-1 text-sm font-medium text-text-primary">Recommend more often</span>
+          <button
+            onClick={() => { setRecommendMore(v => !v); if (!recommendMore) onTogglePreference('more'); }}
+            className={`w-11 h-6 rounded-full transition-colors relative ${recommendMore ? 'bg-accent' : 'bg-white/10'}`}
+          >
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${recommendMore ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
         </div>
 
-        <div className="space-y-3">
-           <button 
-             onClick={onReplace}
-             className="w-full p-5 rounded-3xl bg-surface-elevated border border-white/[0.04] flex items-center justify-between group hover:border-accent/40 transition-all"
-           >
-              <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all">
-                    <RefreshCw size={24} />
-                 </div>
-                 <div className="text-left">
-                    <span className="block text-sm font-black text-text-primary uppercase tracking-tight">Replace Exercise</span>
-                    <span className="block text-[10px] font-bold text-text-muted uppercase tracking-widest mt-0.5">Find a similar alternative</span>
-                 </div>
-              </div>
-              <ChevronRight size={20} className="text-text-muted" />
-           </button>
-
-           <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => onMove('up')}
-                className="flex-1 p-5 rounded-3xl bg-surface-elevated border border-white/[0.04] flex flex-col items-center gap-2 group hover:border-accent/40 transition-all"
-              >
-                 <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-text-muted group-hover:bg-text-primary group-hover:text-background transition-all">
-                    <ArrowUp size={20} />
-                 </div>
-                 <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Move Up</span>
-              </button>
-              <button 
-                onClick={() => onMove('down')}
-                className="flex-1 p-5 rounded-3xl bg-surface-elevated border border-white/[0.04] flex flex-col items-center gap-2 group hover:border-accent/40 transition-all"
-              >
-                 <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-text-muted group-hover:bg-text-primary group-hover:text-background transition-all">
-                    <ArrowDown size={20} />
-                 </div>
-                 <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Move Down</span>
-              </button>
-           </div>
-
-           <button 
-             onClick={onRemove}
-             className="w-full p-5 rounded-3xl bg-danger/5 border border-danger/10 flex items-center justify-between group hover:bg-danger/10 hover:border-danger/30 transition-all"
-           >
-              <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger group-hover:bg-danger group-hover:text-white transition-all">
-                    <Trash2 size={24} />
-                 </div>
-                 <div className="text-left">
-                    <span className="block text-sm font-black text-danger uppercase tracking-tight">Remove</span>
-                    <span className="block text-[10px] font-bold text-danger/60 uppercase tracking-widest mt-0.5">Delete from this session</span>
-                 </div>
-              </div>
-              <ChevronRight size={20} className="text-danger/40" />
-           </button>
+        {/* Recommend less often */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-white/[0.04]">
+          <span className="text-text-primary"><ArrowDown size={20} /></span>
+          <span className="flex-1 text-sm font-medium text-text-primary">Recommend less often</span>
+          <button
+            onClick={() => { setRecommendLess(v => !v); if (!recommendLess) onTogglePreference('less'); }}
+            className={`w-11 h-6 rounded-full transition-colors relative ${recommendLess ? 'bg-accent' : 'bg-white/10'}`}
+          >
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${recommendLess ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-white/[0.06]">
-           <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Personalize Future Workouts</p>
-           <div className="grid grid-cols-3 gap-3">
-              <button 
-                onClick={() => onTogglePreference('more')}
-                className="flex flex-col items-center gap-2 p-4 rounded-3xl bg-surface-elevated border border-white/[0.04] hover:border-success/30 transition-all"
-              >
-                 <Heart size={20} className="text-success" />
-                 <span className="text-[10px] font-black text-text-primary uppercase tracking-tight">More</span>
-              </button>
-              <button 
-                onClick={() => onTogglePreference('less')}
-                className="flex flex-col items-center gap-2 p-4 rounded-3xl bg-surface-elevated border border-white/[0.04] hover:border-yellow-500/30 transition-all"
-              >
-                 <Minus size={20} className="text-yellow-500" />
-                 <span className="text-[10px] font-black text-text-primary uppercase tracking-tight">Less</span>
-              </button>
-              <button 
-                onClick={() => onTogglePreference('exclude')}
-                className="flex flex-col items-center gap-2 p-4 rounded-3xl bg-surface-elevated border border-white/[0.04] hover:border-danger/30 transition-all"
-              >
-                 <Ban size={20} className="text-danger" />
-                 <span className="text-[10px] font-black text-text-primary uppercase tracking-tight">Exclude</span>
-              </button>
-           </div>
-        </div>
+        {/* Don't recommend again */}
+        <button
+          onClick={() => { onTogglePreference('exclude'); onClose(); }}
+          className="flex items-center gap-4 px-6 py-4 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-left"
+        >
+          <span className="text-text-muted"><Ban size={20} /></span>
+          <span className="flex-1 text-sm font-medium text-text-primary">Don&apos;t recommend again</span>
+        </button>
+
+        {/* Delete */}
+        <button
+          onClick={() => { onRemove(); onClose(); }}
+          className="flex items-center gap-4 px-6 py-4 hover:bg-danger/5 transition-colors text-left"
+        >
+          <span className="text-danger"><Trash2 size={20} /></span>
+          <span className="flex-1 text-sm font-bold text-danger">Delete from workout</span>
+        </button>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   FlatList,
+  SectionList,
   Modal,
   Dimensions,
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api from '../lib/api';
 
@@ -33,27 +34,54 @@ interface ExercisePickerProps {
   title?: string;
 }
 
-// ─── Category list data matching the screenshots ──────────────────────────────
+// ─── Category list data matching the spec ────────────────────────────────────
 
 const CATEGORY_ROWS = [
-  { id: 'all',            label: 'All Exercises',            icon: 'barbell-outline',   type: 'ionicon' as const },
-  { id: 'recent',         label: 'Recently Added',           icon: 'time-outline',      type: 'ionicon' as const },
-  { id: 'mine',           label: 'Added By Me',              icon: 'person-outline',    type: 'ionicon' as const },
-  { id: 'by-muscle',      label: 'By Muscle Groups',         icon: 'body-outline',      type: 'ionicon' as const },
-  { id: 'by-equipment',   label: 'By Equipment',             icon: 'construct-outline', type: 'ionicon' as const },
-  { id: 'weighted',       label: 'Weighted Exercises',       icon: 'barbell-outline',   type: 'ionicon' as const },
-  { id: 'bodyweight',     label: 'Bodyweight Only',          icon: 'hand-left-outline', type: 'ionicon' as const },
-  { id: 'bw-equipment',   label: 'Bodyweight with Equipment',icon: 'fitness-outline',   type: 'ionicon' as const },
-  { id: 'cardio',         label: 'Cardio',                   icon: 'heart-outline',     type: 'ionicon' as const },
-  { id: 'stretch',        label: 'Stretching and Mobility',  icon: 'walk-outline',      type: 'ionicon' as const },
+  { id: 'all',            label: 'All Exercises',                   icon: 'barbell-outline'   },
+  { id: 'recent',         label: 'Recently Added to Apex',          icon: 'time-outline'      },
+  { id: 'mine',           label: 'Added By Me',                     icon: 'person-outline'    },
+  { id: 'by-muscle',      label: 'By Muscle Groups',                icon: 'body-outline'      },
+  { id: 'by-equipment',   label: 'By Equipment',                    icon: 'construct-outline' },
+  { id: 'weighted',       label: 'Weighted Exercises',              icon: 'barbell-outline'   },
+  { id: 'bodyweight',     label: 'Bodyweight Only',                 icon: 'hand-left-outline' },
+  { id: 'bw-equipment',   label: 'Bodyweight with Equipment',       icon: 'fitness-outline'   },
+  { id: 'cardio',         label: 'Cardio',                          icon: 'heart-outline'     },
+  { id: 'stretch',        label: 'Stretching and Mobility',         icon: 'walk-outline'      },
 ];
 
 const MUSCLE_GROUPS = [
-  'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps',
-  'Legs', 'Glutes', 'Core', 'Forearms', 'Calves',
+  { name: 'Chest',      pct: '100%' },
+  { name: 'Back',       pct: '95%'  },
+  { name: 'Shoulders',  pct: '85%'  },
+  { name: 'Biceps',     pct: '80%'  },
+  { name: 'Triceps',    pct: '80%'  },
+  { name: 'Legs',       pct: '90%'  },
+  { name: 'Glutes',     pct: '75%'  },
+  { name: 'Core',       pct: '70%'  },
+  { name: 'Forearms',   pct: '60%'  },
+  { name: 'Calves',     pct: '65%'  },
 ];
 
 type TabId = 'all' | 'by-muscle' | 'categories';
+
+// ─── Group exercises alphabetically ──────────────────────────────────────────
+
+function groupAlphabetically(exercises: Exercise[]) {
+  const groups: Record<string, Exercise[]> = {};
+  for (const ex of exercises) {
+    const firstChar = ex.name.charAt(0).toUpperCase();
+    const key = /[A-Z]/.test(firstChar) ? firstChar : '#';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(ex);
+  }
+  return Object.keys(groups)
+    .sort((a, b) => {
+      if (a === '#') return -1;
+      if (b === '#') return 1;
+      return a.localeCompare(b);
+    })
+    .map(key => ({ title: key, data: groups[key] }));
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -131,14 +159,43 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
     handleClose();
   };
 
+  // Alphabetical sections for "All" tab
+  const alphaSections = useMemo(() => groupAlphabetically(exercises), [exercises]);
+
   // What's showing in the list?
-  const showList = searchQuery || activeTab === 'all' ||
+  const showList = !!(searchQuery || activeTab === 'all' ||
     (activeTab === 'by-muscle' && selectedMuscle) ||
-    (activeTab === 'categories' && selectedCategoryId);
+    (activeTab === 'categories' && selectedCategoryId));
+
+  const useAlphaGrouping = !searchQuery && activeTab === 'all';
 
   const headerTitle = selectedMuscle ? selectedMuscle :
     selectedCategoryId ? CATEGORY_ROWS.find(c => c.id === selectedCategoryId)?.label ?? title :
     title;
+
+  // Render a single exercise row (used in both FlatList and SectionList)
+  const renderExerciseItem = (item: Exercise) => {
+    const selected = selectedExercises.has(item.id);
+    return (
+      <TouchableOpacity style={s.exerciseRow} onPress={() => toggleSelect(item)}>
+        <View style={s.exerciseThumb}>
+          {item.mediaUrl ? (
+            <Image source={{ uri: item.mediaUrl }} style={s.exerciseThumbImg} resizeMode="cover" />
+          ) : (
+            <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.exerciseName}>{item.name}</Text>
+          <Text style={s.exerciseSub}>{item.bodyPart || 'General'}{item.muscleGroup ? ` · ${item.muscleGroup}` : ''}</Text>
+        </View>
+        {/* Checkbox on right */}
+        <View style={[s.checkbox, selected && s.checkboxSelected]}>
+          {selected && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -148,7 +205,11 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
           {/* ── Header ──────────────────────────────── */}
           <View style={s.header}>
             <TouchableOpacity onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name={selectedCategoryId || selectedMuscle ? 'chevron-back' : 'options-outline'} size={24} color={colors.brandPrimary} />
+              <Ionicons
+                name={selectedCategoryId || selectedMuscle ? 'chevron-back' : 'options-outline'}
+                size={24}
+                color={colors.brandPrimary}
+              />
             </TouchableOpacity>
             <Text style={s.headerTitle}>{headerTitle}</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -200,55 +261,52 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
               <ActivityIndicator size="large" color={colors.brandPrimary} />
             </View>
           ) : showList ? (
-            // Exercise list
-            <FlatList
-              data={exercises}
-              keyExtractor={item => item.id}
-              contentContainerStyle={s.listContent}
-              renderItem={({ item }) => {
-                const selected = selectedExercises.has(item.id);
-                return (
-                  <TouchableOpacity style={s.exerciseRow} onPress={() => toggleSelect(item)}>
-                    <View style={s.exerciseThumb}>
-                      {item.mediaUrl ? (
-                        <Image source={{ uri: item.mediaUrl }} style={s.exerciseThumbImg} resizeMode="cover" />
-                      ) : (
-                        <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
-                      )}
-                      {selected && (
-                        <View style={s.exerciseThumbOverlay}>
-                          <Ionicons name="checkmark" size={18} color="#fff" />
-                        </View>
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.exerciseName}>{item.name}</Text>
-                      <Text style={s.exerciseSub}>{item.bodyPart || 'General'} · {item.muscleGroup || 'Full Body'}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={s.center}><Text style={s.emptyText}>No exercises found</Text></View>
-              }
-            />
+            useAlphaGrouping ? (
+              // Alphabetically grouped SectionList for "All" tab
+              <SectionList
+                sections={alphaSections}
+                keyExtractor={item => item.id}
+                contentContainerStyle={s.listContent}
+                renderSectionHeader={({ section }) => (
+                  <View style={s.sectionHeader}>
+                    <Text style={s.sectionHeaderText}>{section.title}</Text>
+                  </View>
+                )}
+                renderItem={({ item }) => renderExerciseItem(item)}
+                ListEmptyComponent={
+                  <View style={s.center}><Text style={s.emptyText}>No exercises found</Text></View>
+                }
+                stickySectionHeadersEnabled={false}
+              />
+            ) : (
+              // Flat list for search results or category/muscle drill-down
+              <FlatList
+                data={exercises}
+                keyExtractor={item => item.id}
+                contentContainerStyle={s.listContent}
+                renderItem={({ item }) => renderExerciseItem(item)}
+                ListEmptyComponent={
+                  <View style={s.center}><Text style={s.emptyText}>No exercises found</Text></View>
+                }
+              />
+            )
           ) : activeTab === 'by-muscle' && !selectedMuscle ? (
-            // Muscle group list
+            // Muscle group list with percentage labels
             <FlatList
               data={MUSCLE_GROUPS}
-              keyExtractor={item => item}
+              keyExtractor={item => item.name}
               contentContainerStyle={s.listContent}
               renderItem={({ item }) => (
-                <TouchableOpacity style={s.categoryRow} onPress={() => setSelectedMuscle(item)}>
+                <TouchableOpacity style={s.muscleRow} onPress={() => setSelectedMuscle(item.name)}>
                   <Ionicons name="body-outline" size={22} color={colors.textMuted} />
-                  <Text style={s.categoryLabel}>{item}</Text>
+                  <Text style={s.categoryLabel}>{item.name}</Text>
+                  <Text style={s.musclePercent}>{item.pct}</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             />
           ) : activeTab === 'categories' && !selectedCategoryId ? (
-            // Categories list (matches screenshot)
+            // Categories list
             <FlatList
               data={CATEGORY_ROWS}
               keyExtractor={item => item.id}
@@ -274,7 +332,9 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
               disabled={selectedExercises.size === 0}
             >
               <Text style={s.addBtnText}>
-                {selectedExercises.size > 0 ? `Add ${selectedExercises.size} Exercise${selectedExercises.size > 1 ? 's' : ''}` : 'Add Exercises'}
+                {selectedExercises.size > 0
+                  ? `Add ${selectedExercises.size} Exercise${selectedExercises.size > 1 ? 's' : ''}`
+                  : 'Add Exercises'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -327,12 +387,25 @@ const s = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'transparent',
   },
-  tabActive: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
+  tabActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
   tabText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   tabTextActive: { color: colors.textPrimary, fontWeight: '700' },
-  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120 },
+
+  // Section header for alphabetical groups
+  sectionHeader: {
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+  },
+
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,6 +415,23 @@ const s = StyleSheet.create({
     gap: 16,
   },
   categoryLabel: { flex: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary },
+
+  // Muscle row with percentage
+  muscleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+    gap: 16,
+  },
+  musclePercent: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginRight: 4,
+  },
+
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,22 +449,29 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  exerciseThumbImg: {
-    width: '100%',
-    height: '100%',
-  },
-  exerciseThumbOverlay: {
-    position: 'absolute',
-    inset: 0,
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: colors.brandPrimary + 'cc',
+  exerciseThumbImg: { width: '100%', height: '100%' },
+  exerciseName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  exerciseSub: { fontSize: 13, color: colors.textMuted, marginTop: 3 },
+
+  // Checkbox (outlined square, filled with checkmark when selected)
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  exerciseName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  exerciseSub: { fontSize: 13, color: colors.textMuted, marginTop: 3 },
+  checkboxSelected: {
+    backgroundColor: colors.brandPrimary,
+    borderColor: colors.brandPrimary,
+  },
+
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { color: colors.textMuted, fontSize: 16 },
+
   bottomBar: {
     position: 'absolute',
     bottom: 0,
