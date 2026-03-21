@@ -27,6 +27,7 @@ import { useTodayWorkout, useTrainingHistory } from '../../hooks/useWorkout';
 import { useProgress } from '../../hooks/useProgress';
 import { useProfile } from '../../hooks/useProfile';
 import SwapWorkoutSheet from '../../components/SwapWorkoutSheet';
+import GeneratingWorkoutModal from '../../components/GeneratingWorkoutModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -127,6 +128,7 @@ export default function DashboardScreen() {
   const [showSwapSheet, setShowSwapSheet] = useState(false);
   const [currentWeekDays, setCurrentWeekDays] = useState<any[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const dashState = useMemo<DashState>(() => {
     if (loadingWorkout) return 'loading';
@@ -414,19 +416,37 @@ export default function DashboardScreen() {
         onClose={() => setShowSwapSheet(false)}
         currentWorkoutDayId={workoutDay?.id}
         splitDays={currentWeekDays}
-        onSelectDay={(day) => {
-          // In Dashboard, swapping means changing the todayWorkout day.
-          // Since useTodayWorkout holds its own state, we might need a way to update it.
-          // For now, we'll refresh the workout or use a local override if we want instant feedback.
-          // The most reliable way is to call the swap API if it exists, or just refresh.
-          console.log('[DashboardScreen] Swapping to day:', day.id);
-          // TODO: If there's a background swap API, call it here.
-          // For now, we just log it and potentially the user will see it update on refresh.
-          refreshWorkout();
+        onSelectDay={async (day) => {
+          console.log('[Swap] Option tapped:', day.id);
+          
+          // 1. Close the swap sheet first
+          setShowSwapSheet(false);
+          
+          // 2. Wait a small gap to let the first modal start its dismissal.
+          // This prevents modal mount/unmount conflicts in React Native.
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          console.log('[Swap] Loading state ON');
+          setIsGenerating(true);
+          
+          // 3. Mandatory delay for premium feel
+          console.log('[Swap] Workout update starting');
+          await new Promise(resolve => setTimeout(resolve, 1200));
+          
+          try {
+            await refreshWorkout();
+            console.log('[Swap] Workout update complete');
+          } catch (err) {
+            console.error('[Swap] Workout update failed:', err);
+          } finally {
+            setIsGenerating(false);
+            console.log('[Swap] Loading state OFF');
+          }
         }}
         onPickMuscles={() => navigation.navigate('Workout' as never)}
         onCreateCustom={() => navigation.navigate('Workout' as never)}
       />
+      <GeneratingWorkoutModal visible={isGenerating} />
     </View>
   );
 }

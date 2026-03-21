@@ -26,6 +26,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '../../services/api';
 import ExercisePicker from '../../components/ExercisePicker';
 import SwapWorkoutSheet from '../../components/SwapWorkoutSheet';
+import GeneratingWorkoutModal from '../../components/GeneratingWorkoutModal';
 import type { TodayWorkout, SessionExercise, ActiveSession } from '../../types/workout';
 import type { SessionStackParamList } from '../../navigation/types';
 
@@ -1098,22 +1099,30 @@ const finishStyles = StyleSheet.create({
 // ─── ExerciseImage ────────────────────────────────────────────────────────────
 // Wrapper around Image that falls back to the barbell placeholder on load error.
 
-function ExerciseImage({ uri, style }: { uri: string; style: any }) {
+function ExerciseImage({ uri, style }: { uri: string | null | undefined; style: any }) {
   const [failed, setFailed] = useState(false);
-  if (failed) {
+
+  // Pre-process URI: handle relative paths (e.g. from wger)
+  let finalUri = uri;
+  if (finalUri && finalUri.startsWith('/media/')) {
+    finalUri = `https://wger.de${finalUri}`;
+  }
+
+  if (!finalUri || failed) {
     return (
-      <View style={[style, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Ionicons name="barbell-outline" size={48} color="rgba(255,255,255,0.15)" />
+      <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+        <Ionicons name="barbell-outline" size={32} color="rgba(255,255,255,0.15)" />
       </View>
     );
   }
+
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: finalUri }}
       style={style}
       resizeMode="cover"
-      onError={() => {
-        console.warn('[WorkoutScreen] Image failed to load:', uri);
+      onError={(error) => {
+        console.warn(`[WorkoutScreen] Image failed to load: ${finalUri}`, error);
         setFailed(true);
       }}
     />
@@ -1169,6 +1178,7 @@ export default function WorkoutScreen() {
   const [showSwapSheet, setShowSwapSheet] = useState(false);
   const [currentWeekDays, setCurrentWeekDays] = useState<any[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Sync
   const [syncPrefs, setSyncPrefs] = useState({ appleHealth: false, strava: false, fitbit: false });
@@ -1663,10 +1673,33 @@ export default function WorkoutScreen() {
           onClose={() => setShowSwapSheet(false)}
           currentWorkoutDayId={workout?.workoutDay?.id}
           splitDays={currentWeekDays}
-          onSelectDay={(day) => {
-            console.log('[WorkoutScreen] Swapping to day:', day.id);
-            setWorkout(prev => prev ? { ...prev, workoutDay: day } : null);
-            setExercises(mapToExercises({ ...workout!, workoutDay: day }));
+          onSelectDay={async (day) => {
+            console.log('[Swap] Option tapped:', day.id);
+            
+            // 1. Close the swap sheet first
+            setShowSwapSheet(false);
+            
+            // 2. Wait a small gap to let the first modal start its dismissal.
+            // This prevents modal mount/unmount conflicts in React Native.
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            console.log('[Swap] Loading state ON');
+            setIsGenerating(true);
+            
+            // 3. Mandatory delay for premium feel
+            console.log('[Swap] Workout update starting');
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            
+            try {
+              setWorkout(prev => prev ? { ...prev, workoutDay: day } : null);
+              setExercises(mapToExercises({ ...workout!, workoutDay: day }));
+              console.log('[Swap] Workout update complete');
+            } catch (err) {
+              console.error('[Swap] Workout update failed:', err);
+            } finally {
+              setIsGenerating(false);
+              console.log('[Swap] Loading state OFF');
+            }
           }}
           onPickMuscles={() => navigation.navigate('ExerciseSelection')}
           onCreateCustom={() => navigation.navigate('ExerciseSelection')}
@@ -1921,6 +1954,7 @@ export default function WorkoutScreen() {
             }
           }}
         />
+        <GeneratingWorkoutModal visible={isGenerating} />
       </SafeAreaView>
     </View>
   );

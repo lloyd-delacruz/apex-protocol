@@ -268,17 +268,21 @@ async function upsertExercise(raw: ExerciseDbExercise): Promise<ExerciseOutcome>
       return 'skipped';
     }
 
-    // Enrich with sync metadata and missing media only — preserve taxonomy
+    // Enrich with sync metadata and media/instructions
+    // If the existing exercise didn't have an externalId/source, we now claim it for ExerciseDB.
     await prisma.exercise.update({
       where: { id: byName.id },
       data: {
         externalId:      data.externalId,
         externalSource:  data.externalSource,
         lastSyncedAt:    data.lastSyncedAt,
-        // Only backfill if currently null — don't overwrite hand-authored data
-        ...(byName.mediaUrl    === null && { mediaUrl: data.mediaUrl }),
-        ...(byName.instructions === null && { instructions: data.instructions }),
-        ...(byName.secondaryMuscles === null && { secondaryMuscles: data.secondaryMuscles }),
+        // Update mediaUrl if we have a new one and the current one is empty or from wger
+        mediaUrl:        data.mediaUrl || byName.mediaUrl,
+        instructions:     data.instructions || byName.instructions,
+        secondaryMuscles: data.secondaryMuscles || byName.secondaryMuscles,
+        // Also update taxonomy if it was previously empty/generic
+        ...(byName.bodyPart === 'General' && { bodyPart: data.bodyPart }),
+        ...(byName.equipment === 'none' && { equipment: data.equipment }),
       },
     });
     return 'updated';

@@ -1,10 +1,3 @@
-/**
- * ExerciseImportService — Unit Tests
- *
- * Verifies import, upsert, deduplication, and error handling.
- * Mocks both ExerciseDbService (HTTP) and Prisma (database).
- */
-
 import { ExerciseImportService } from '../services/ExerciseImportService';
 
 // ─── Mock ExerciseDbService ───────────────────────────────────────────────────
@@ -19,22 +12,22 @@ jest.mock('../services/ExerciseDbService', () => ({
 
 // ─── Mock Prisma ──────────────────────────────────────────────────────────────
 
-const mockPrismaExercise = {
-  findFirst: jest.fn(),
-  update: jest.fn().mockResolvedValue({}),
-  create: jest.fn().mockResolvedValue({}),
-};
-
 jest.mock('../db/prisma', () => ({
   __esModule: true,
   default: {
-    exercise: mockPrismaExercise,
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    exercise: {
+      findFirst: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+      create: jest.fn().mockResolvedValue({}),
+    },
   },
 }));
 
-// ─── Imports (after mocks) ────────────────────────────────────────────────────
-
+import prisma from '../db/prisma';
 import { ExerciseDbService } from '../services/ExerciseDbService';
+
+const mockPrismaExercise = prisma.exercise as any;
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -73,77 +66,77 @@ beforeEach(() => {
 // ─── normalise() — pure function ─────────────────────────────────────────────
 
 describe('normalise()', () => {
-  it('maps ExerciseDB bodyPart to Apex Protocol bodyPart', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('maps ExerciseDB bodyPart to Apex Protocol bodyPart', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.bodyPart).toBe('Upper Body');
   });
 
-  it('maps ExerciseDB equipment to Apex Protocol equipment', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('maps ExerciseDB equipment to Apex Protocol equipment', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.equipment).toBe('barbell');
   });
 
-  it('maps body weight equipment to bodyweight', () => {
-    const result = ExerciseImportService.normalise({ ...rawExercise, equipment: 'body weight' });
+  it('maps body weight equipment to bodyweight', async () => {
+    const result = await ExerciseImportService.normalise({ ...rawExercise, equipment: 'body weight' });
     expect(result.equipment).toBe('bodyweight');
   });
 
-  it('sets externalId and externalSource correctly', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('sets externalId and externalSource correctly', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.externalId).toBe('ext-001');
     expect(result.externalSource).toBe('exercisedb');
   });
 
-  it('title-cases the exercise name', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('title-cases the exercise name', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.name).toBe('Barbell Bench Press');
   });
 
-  it('joins instructions into a numbered string', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('joins instructions into a numbered string', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.instructions).toContain('1.');
     expect(result.instructions).toContain('2.');
   });
 
-  it('sets instructions to null when instructions array is empty', () => {
-    const result = ExerciseImportService.normalise({ ...rawExercise, instructions: [] });
+  it('sets instructions to null when instructions array is empty', async () => {
+    const result = await ExerciseImportService.normalise({ ...rawExercise, instructions: [] });
     expect(result.instructions).toBeNull();
   });
 
-  it('sets movementPattern via classification', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('sets movementPattern via classification', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     // Bench press should be horizontal_push
     expect(result.movementPattern).toBe('horizontal_push');
   });
 
-  it('sets isCompound via classification', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('sets isCompound via classification', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.isCompound).toBe(true);
   });
 
-  it('sets goalTags including strength for barbell compound', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('sets goalTags including strength for barbell compound', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.goalTags).toEqual(expect.arrayContaining(['strength', 'hypertrophy']));
   });
 
-  it('maps upper arms body part to Upper Body', () => {
-    const result = ExerciseImportService.normalise(rawExercise2);
+  it('maps upper arms body part to Upper Body', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise2);
     expect(result.bodyPart).toBe('Upper Body');
   });
 
-  it('maps waist body part to Core', () => {
+  it('maps waist body part to Core', async () => {
     const coreEx = { ...rawExercise, bodyPart: 'waist', target: 'abs' };
-    const result = ExerciseImportService.normalise(coreEx);
+    const result = await ExerciseImportService.normalise(coreEx);
     expect(result.bodyPart).toBe('Core');
   });
 
-  it('sets mediaUrl from gifUrl', () => {
-    const result = ExerciseImportService.normalise(rawExercise);
+  it('sets mediaUrl from gifUrl', async () => {
+    const result = await ExerciseImportService.normalise(rawExercise);
     expect(result.mediaUrl).toBe('https://example.com/bench.gif');
   });
 
-  it('sets mediaUrl to null when gifUrl is empty string', () => {
-    const result = ExerciseImportService.normalise({ ...rawExercise, gifUrl: '' });
+  it('sets mediaUrl to null when gifUrl is empty string', async () => {
+    const result = await ExerciseImportService.normalise({ ...rawExercise, gifUrl: '' });
     expect(result.mediaUrl).toBeNull();
   });
 });
@@ -228,12 +221,12 @@ describe('deduplication — strategy 2 (name match)', () => {
     expect(mockPrismaExercise.update).not.toHaveBeenCalled();
   });
 
-  it('does NOT overwrite existing non-null mediaUrl when enriching', async () => {
+  it('overwrites existing mediaUrl when enriching to ensure ExerciseDB GIFs are used', async () => {
     const localRecord = {
       id: 'db-uuid-004',
       externalId: null,
       externalSource: null,
-      mediaUrl: 'https://existing-media.com/bench.gif',  // already set
+      mediaUrl: 'https://existing-media.com/bench.gif',  // poor quality or wger
       instructions: null,
       secondaryMuscles: null,
     };
@@ -245,8 +238,8 @@ describe('deduplication — strategy 2 (name match)', () => {
     await ExerciseImportService.importByBodyPart('chest');
 
     const updateCall = mockPrismaExercise.update.mock.calls[0][0];
-    // mediaUrl should NOT be in the update data (it's already set)
-    expect(updateCall.data.mediaUrl).toBeUndefined();
+    // mediaUrl should be in the update data now
+    expect(updateCall.data.mediaUrl).toBe('https://example.com/bench.gif');
   });
 });
 

@@ -108,7 +108,7 @@ export default function SwapWorkoutSheet({
                         styles.dayRow, 
                         isSelected && { backgroundColor: 'rgba(0, 194, 255, 0.05)' }
                       ]} 
-                      onPress={() => { onSelectDay(day); onClose(); }}
+                      onPress={() => { onSelectDay(day); }}
                     >
                       <View style={styles.dayThumb}>
                         {firstExMedia ? (
