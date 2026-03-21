@@ -89,10 +89,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 if (process.env.NODE_ENV !== 'test') {
   const PORT = config.port;
   // Listening on '::' allows both IPv4 and IPv6 connections on most systems
-  app.listen(PORT, '::', () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log('────────────────────────────────────────────────────────────────');
     console.log(`🚀 Apex Protocol API is LIVE`);
-    console.log(`📡 Listening on: [::]:${PORT}`);
+    console.log(`📡 Listening on: 0.0.0.0:${PORT}`);
     console.log(`⚙️  Environment: ${config.nodeEnv}`);
     console.log('────────────────────────────────────────────────────────────────');
   });

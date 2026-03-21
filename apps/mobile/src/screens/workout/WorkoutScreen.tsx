@@ -21,9 +21,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, statusColors, statusBackgrounds } from '../../theme/colors';
 import { TrainingStatus } from '@apex/shared';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '../../services/api';
 import ExercisePicker from '../../components/ExercisePicker';
 import type { TodayWorkout, SessionExercise, ActiveSession } from '../../types/workout';
+import type { SessionStackParamList } from '../../navigation/types';
 
 const { width } = Dimensions.get('window');
 
@@ -1135,6 +1138,7 @@ function Background() {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function WorkoutScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<SessionStackParamList, 'WorkoutMain'>>();
   const [screenState, setScreenState] = useState<WorkoutState>('loading');
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [workout, setWorkout] = useState<TodayWorkout | null>(null);
@@ -1602,7 +1606,7 @@ export default function WorkoutScreen() {
               ))}
 
               {/* Add Exercise */}
-              <TouchableOpacity style={ms.addExerciseRow} onPress={() => setShowExercisePicker(true)}>
+              <TouchableOpacity style={ms.addExerciseRow} onPress={() => navigation.navigate('ExerciseSelection')}>
                 <View style={ms.addExerciseIcon}>
                   <Ionicons name="add" size={20} color={colors.brandPrimary} />
                 </View>

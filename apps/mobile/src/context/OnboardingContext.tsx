@@ -169,8 +169,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         experienceLevel: state.experience,
         daysPerWeek: state.workoutsPerWeek,
         equipment,
-        // Optional tracking data
-        bestLifts: state.bestLifts,
       });
 
       if (res.success && res.data) {

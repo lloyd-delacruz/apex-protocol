@@ -32,25 +32,22 @@ function getApiBaseUrl(): string {
     return envUrl;
   }
 
-  const expoGoDebuggerHost = (Constants as any)?.expoGoConfig?.debuggerHost as
-    | string
-    | undefined;
-
-  const manifest2HostUri = (Constants as any)?.manifest2?.extra?.expoClient
-    ?.hostUri as string | undefined;
-
-  const legacyManifestDebuggerHost = (Constants as any)?.manifest?.debuggerHost as
-    | string
-    | undefined;
+  // Common locations for the debugger host in different Expo versions
+  const expoGoDebuggerHost = (Constants as any)?.expoGoConfig?.debuggerHost;
+  const expoConfigHostUri = (Constants as any)?.expoConfig?.hostUri;
+  const manifest2HostUri = (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
+  const legacyManifestDebuggerHost = (Constants as any)?.manifest?.debuggerHost;
 
   console.log('[API] Detection — Constants.expoGoConfig?.debuggerHost:', expoGoDebuggerHost);
+  console.log('[API] Detection — Constants.expoConfig?.hostUri:', expoConfigHostUri);
   console.log('[API] Detection — Constants.manifest2?.extra?.expoClient?.hostUri:', manifest2HostUri);
   console.log('[API] Detection — Constants.manifest?.debuggerHost:', legacyManifestDebuggerHost);
 
   const debuggerHost =
-    expoGoDebuggerHost ?? manifest2HostUri ?? legacyManifestDebuggerHost;
+    expoGoDebuggerHost ?? expoConfigHostUri ?? manifest2HostUri ?? legacyManifestDebuggerHost;
 
   if (debuggerHost) {
+    // hostUri usually includes the port (e.g. 192.168.1.50:8081), we only want the IP
     const host = debuggerHost.split(':')[0];
     const resolvedUrl = `http://${host}:4001`;
     console.info('[API] Success — Resolved API_BASE_URL from Expo host:', resolvedUrl);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BodyStackParamList } from '../../navigation/types';
@@ -21,9 +21,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { api } from '../../services/api';
-import type { MetricEntry } from '../../types/api';
 import { useLatestMetrics, useMetricsHistory } from '../../hooks/useMetrics';
 import ScreenErrorState from '../../components/ScreenErrorState';
+import BodyDashboardCard from '../../components/body/BodyDashboardCard';
 
 interface LogForm {
   body_weight: string;
@@ -47,12 +47,11 @@ const DEFAULT_FORM: LogForm = {
   notes: '',
 };
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function BodyScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<BodyStackParamList>>();
   const { metrics: latest, loading: loadingLatest, error: errorLatest, refresh: refreshLatest } = useLatestMetrics();
-  const { entries: metrics, loading: loadingHistory, error: errorHistory, refresh: refreshHistory } = useMetricsHistory(14);
+  const { entries: metrics, loading: loadingHistory, error: errorHistory, refresh: refreshHistory } = useMetricsHistory(7);
+  
   const loading = loadingLatest || loadingHistory;
   const error = errorLatest ?? errorHistory ?? null;
   const [refreshing, setRefreshing] = useState(false);
@@ -110,34 +109,32 @@ export default function BodyScreen() {
         Alert.alert('Error', res.error || 'Failed to save metrics');
       }
     } catch {
-      Alert.alert('Connection Error', 'Could not reach the server. Check your connection.');
+      Alert.alert('Connection Error', 'Could not reach the server.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Weight trend — last 7 entries that have a weight value, oldest first
-  const weightEntries = metrics
-    .filter(m => m.body_weight_kg !== null)
-    .slice(0, 7)
-    .reverse();
-
-  const maxW = weightEntries.length > 0 ? Math.max(...weightEntries.map(m => m.body_weight_kg!)) : 1;
-  const minW = weightEntries.length > 0 ? Math.min(...weightEntries.map(m => m.body_weight_kg!)) : 0;
-  const range = maxW - minW || 1;
+  const weightTrend = useMemo(() => {
+    if (metrics.length < 2) return undefined;
+    const latestW = metrics[0].body_weight_kg;
+    const prevW = metrics[1].body_weight_kg;
+    if (latestW === null || prevW === null) return undefined;
+    const diff = latestW - prevW;
+    const absDiff = Math.abs(diff).toFixed(1);
+    const unit = metrics[0].body_weight_unit || 'kg';
+    return {
+      value: `${diff > 0 ? '+' : diff < 0 ? '-' : ''}${absDiff} ${unit}`,
+      isPositive: diff <= 0, // In weight loss context, down is positive (green)
+    };
+  }, [metrics]);
 
   const formatDate = (d: string) => {
     const date = new Date(d + 'T00:00:00');
-    return `${date.getMonth() + 1}/${date.getDate()}`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const formatWeight = (w: number | null, unit: string) => {
-    if (w === null) return '—';
-    if (unit === 'lb') return `${(w * 2.2046).toFixed(1)} lb`;
-    return `${w.toFixed(1)} kg`;
-  };
-
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
@@ -150,7 +147,7 @@ export default function BodyScreen() {
     return (
       <View style={styles.loadingContainer}>
         <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
-        <ScreenErrorState message={error} onRetry={async () => { await Promise.all([refreshLatest(), refreshHistory()]); }} />
+        <ScreenErrorState message={error} onRetry={onRefresh} />
       </View>
     );
   }
@@ -159,20 +156,12 @@ export default function BodyScreen() {
     <View style={styles.container}>
       <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.inner}>
-
-        {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Body</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.targetsBtn} onPress={() => navigation.navigate('Targets')} activeOpacity={0.8}>
-              <Ionicons name="flag-outline" size={16} color={colors.brandPrimary} />
-              <Text style={styles.targetsBtnText}>Targets</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logBtn} onPress={openLog} activeOpacity={0.85}>
-              <Ionicons name="add" size={18} color={colors.background} />
-              <Text style={styles.logBtnText}>Log Today</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.logBtn} onPress={openLog} activeOpacity={0.85}>
+            <Ionicons name="add" size={20} color={colors.background} />
+            <Text style={styles.logBtnText}>Log Today</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -186,106 +175,77 @@ export default function BodyScreen() {
             />
           }
         >
-          {/* ── Weight Hero ── */}
-          <View style={styles.weightHero}>
-            <Text style={styles.weightLabel}>CURRENT WEIGHT</Text>
-            <Text style={styles.weightValue}>
-              {latest?.body_weight_kg
-                ? formatWeight(latest.body_weight_kg, latest.body_weight_unit)
-                : '—'}
-            </Text>
-            {latest?.date ? (
-              <Text style={styles.weightDate}>Last logged {formatDate(latest.date)}</Text>
-            ) : (
-              <Text style={styles.weightDate}>No entries yet</Text>
-            )}
+          {/* Main Dashboard Cards */}
+          <BodyDashboardCard
+            title="Body Weight"
+            icon="speedometer-outline"
+            value={latest?.body_weight_kg ? `${latest.body_weight_kg}` : '—'}
+            unit={latest?.body_weight_unit || 'kg'}
+            subtitle={latest?.date ? `Last logged ${formatDate(latest.date)}` : 'No data yet'}
+            trend={weightTrend}
+            onPress={() => navigation.navigate('BodyWeightDetail')}
+          />
+
+          <BodyDashboardCard
+            title="Body Fat %"
+            icon="fitness-outline"
+            value="—"
+            unit="%"
+            subtitle="Analyze your lean mass"
+            onPress={() => navigation.navigate('BodyFatDetail')}
+          />
+
+          <BodyDashboardCard
+            title="Measurements"
+            icon="body-outline"
+            value="—"
+            unit="items"
+            subtitle="Track dimensions of 13 parts"
+            onPress={() => navigation.navigate('BodyMeasurements')}
+          />
+
+          <BodyDashboardCard
+            title="Body Photos"
+            icon="camera-outline"
+            value="—"
+            unit="photos"
+            subtitle="Front, Back, Side"
+            onPress={() => navigation.navigate('BodyPhotos')}
+          />
+
+          <BodyDashboardCard
+            title="Body Statistics"
+            icon="bar-chart-outline"
+            value="View"
+            subtitle="BMI, BMR, TDEE, Lean Mass"
+            onPress={() => navigation.navigate('BodyStatistics')}
+          />
+
+          {/* Health Metrics Grid (Legacy Support) */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Daily Health</Text>
+          </View>
+          <View style={styles.statsGrid}>
+            <StatSmallCard label="Calories" value={latest?.calories ? `${latest.calories}` : '—'} unit="kcal" icon="flame-outline" />
+            <StatSmallCard label="Protein" value={latest?.protein_g ? `${latest.protein_g}` : '—'} unit="g" icon="fish-outline" />
+            <StatSmallCard label="Sleep" value={latest?.sleep_hours ? `${latest.sleep_hours}` : '—'} unit="hrs" icon="moon-outline" />
+            <StatSmallCard label="Mood" value={latest?.mood ? `${latest.mood}` : '—'} unit="/10" icon="happy-outline" />
           </View>
 
-          {/* ── Daily Stats Grid ── */}
-          <View style={styles.grid}>
-            <StatCard icon="flame-outline" label="Calories" value={latest?.calories ? `${latest.calories}` : '—'} unit="kcal" />
-            <StatCard icon="fish-outline" label="Protein" value={latest?.protein_g ? `${latest.protein_g}` : '—'} unit="g" />
-            <StatCard icon="moon-outline" label="Sleep" value={latest?.sleep_hours ? `${latest.sleep_hours}` : '—'} unit="hrs" />
-            <StatCard icon="happy-outline" label="Mood" value={latest?.mood ? `${latest.mood}` : '—'} unit="/10" />
-          </View>
-
-          {/* ── Weight Trend Chart ── */}
-          {weightEntries.length > 1 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Weight Trend</Text>
-              <View style={styles.chartCard}>
-                <View style={styles.chart}>
-                  {weightEntries.map((m) => {
-                    const barH = Math.max(8, ((m.body_weight_kg! - minW) / range) * 72 + 8);
-                    return (
-                      <View key={m.id} style={styles.barCol}>
-                        <View style={[styles.bar, { height: barH }]} />
-                        <Text style={styles.barLabel}>{formatDate(m.date)}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-                <View style={styles.chartLegend}>
-                  <Text style={styles.chartLegendText}>
-                    Low: {formatWeight(minW, latest?.body_weight_unit || 'kg')}
-                  </Text>
-                  <Text style={styles.chartLegendText}>
-                    High: {formatWeight(maxW, latest?.body_weight_unit || 'kg')}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ── History List ── */}
-          {metrics.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>History</Text>
-              {metrics.slice(0, 14).map((m) => (
-                <View key={m.id} style={styles.histRow}>
-                  <View style={styles.histLeft}>
-                    <Text style={styles.histDate}>{formatDate(m.date)}</Text>
-                    {m.notes ? (
-                      <Text style={styles.histNotes} numberOfLines={1}>{m.notes}</Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.histRight}>
-                    {m.body_weight_kg ? (
-                      <Text style={styles.histWeight}>
-                        {formatWeight(m.body_weight_kg, m.body_weight_unit)}
-                      </Text>
-                    ) : null}
-                    <View style={styles.histPills}>
-                      {m.calories ? <Text style={styles.pill}>{m.calories} kcal</Text> : null}
-                      {m.sleep_hours ? <Text style={styles.pill}>{m.sleep_hours}h sleep</Text> : null}
-                      {m.mood ? <Text style={styles.pill}>mood {m.mood}</Text> : null}
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="body-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No entries yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Tap "Log Today" to start tracking your body metrics.
-              </Text>
-            </View>
-          )}
+          <TouchableOpacity style={styles.targetsBtn} onPress={() => navigation.navigate('Targets')}>
+            <Ionicons name="flag-outline" size={18} color={colors.brandPrimary} />
+            <Text style={styles.targetsBtnText}>Manage Goals & Targets</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
 
-      {/* ── Log Modal ── */}
+      {/* Log Modal (Existing Logic Preserved) */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
           <SafeAreaView style={{ flex: 1 }}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={{ flex: 1 }}
-            >
-              {/* Modal header */}
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setShowModal(false)}>
                   <Text style={styles.modalCancel}>Cancel</Text>
@@ -300,12 +260,7 @@ export default function BodyScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.modalScroll}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* Unit toggle */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
                 <View style={styles.unitRow}>
                   <Text style={styles.fieldLabel}>Weight Unit</Text>
                   <View style={styles.unitToggle}>
@@ -315,79 +270,30 @@ export default function BodyScreen() {
                         style={[styles.unitBtn, form.unit === u && styles.unitBtnActive]}
                         onPress={() => setForm(f => ({ ...f, unit: u }))}
                       >
-                        <Text style={[styles.unitBtnText, form.unit === u && styles.unitBtnTextActive]}>
-                          {u}
-                        </Text>
+                        <Text style={[styles.unitBtnText, form.unit === u && styles.unitBtnTextActive]}>{u}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
 
-                <ModalField
-                  icon="scale-outline"
-                  label={`Body Weight (${form.unit})`}
-                  value={form.body_weight}
-                  onChange={v => setForm(f => ({ ...f, body_weight: v }))}
-                  placeholder="0.0"
-                  keyboardType="decimal-pad"
-                />
-                <ModalField
-                  icon="flame-outline"
-                  label="Calories"
-                  value={form.calories}
-                  onChange={v => setForm(f => ({ ...f, calories: v }))}
-                  placeholder="2000"
-                  keyboardType="number-pad"
-                />
-                <ModalField
-                  icon="fish-outline"
-                  label="Protein (g)"
-                  value={form.protein}
-                  onChange={v => setForm(f => ({ ...f, protein: v }))}
-                  placeholder="150"
-                  keyboardType="number-pad"
-                />
-                <ModalField
-                  icon="moon-outline"
-                  label="Sleep (hours)"
-                  value={form.sleep}
-                  onChange={v => setForm(f => ({ ...f, sleep: v }))}
-                  placeholder="8.0"
-                  keyboardType="decimal-pad"
-                />
-                <ModalField
-                  icon="happy-outline"
-                  label="Mood (1–10)"
-                  value={form.mood}
-                  onChange={v => setForm(f => ({ ...f, mood: v }))}
-                  placeholder="7"
-                  keyboardType="number-pad"
-                />
-                <ModalField
-                  icon="barbell-outline"
-                  label="Training Performance (1–10)"
-                  value={form.training_performance}
-                  onChange={v => setForm(f => ({ ...f, training_performance: v }))}
-                  placeholder="8"
-                  keyboardType="number-pad"
-                />
-
-                {/* Notes */}
+                <ModalField icon="scale-outline" label={`Body Weight (${form.unit})`} value={form.body_weight} onChange={(v: string) => setForm(f => ({ ...f, body_weight: v }))} placeholder="0.0" keyboardType="decimal-pad" />
+                <ModalField icon="flame-outline" label="Calories" value={form.calories} onChange={(v: string) => setForm(f => ({ ...f, calories: v }))} placeholder="2000" keyboardType="number-pad" />
+                <ModalField icon="fish-outline" label="Protein (g)" value={form.protein} onChange={(v: string) => setForm(f => ({ ...f, protein: v }))} placeholder="150" keyboardType="number-pad" />
+                <ModalField icon="moon-outline" label="Sleep (hours)" value={form.sleep} onChange={(v: string) => setForm(f => ({ ...f, sleep: v }))} placeholder="8.0" keyboardType="decimal-pad" />
+                <ModalField icon="happy-outline" label="Mood (1–10)" value={form.mood} onChange={(v: string) => setForm(f => ({ ...f, mood: v }))} placeholder="7" keyboardType="number-pad" />
+                
                 <View style={styles.fieldBlock}>
                   <View style={styles.fieldHeaderRow}>
                     <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
                     <Text style={styles.fieldLabel}>Notes</Text>
                   </View>
                   <TextInput
-                    style={[styles.inputBox, styles.notesBox]}
+                    style={[styles.inputBox, styles.notesBox, { color: colors.textPrimary }]}
                     value={form.notes}
-                    onChangeText={v => setForm(f => ({ ...f, notes: v }))}
+                    onChangeText={(v: string) => setForm(f => ({ ...f, notes: v }))}
                     placeholder="Optional notes…"
                     placeholderTextColor={colors.textMuted}
                     multiline
-                    numberOfLines={3}
-                    // @ts-ignore
-                    color={colors.textPrimary}
                   />
                 </View>
               </ScrollView>
@@ -399,26 +305,19 @@ export default function BodyScreen() {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function StatCard({
-  icon, label, value, unit,
-}: { icon: string; label: string; value: string; unit: string }) {
+function StatSmallCard({ label, value, unit, icon }: { label: string; value: string; unit: string; icon: string }) {
   return (
-    <View style={styles.statCard}>
-      <Ionicons name={icon as any} size={22} color={colors.brandPrimary} />
-      <View style={styles.statValueRow}>
-        <Text style={styles.statValue}>{value}</Text>
-        {value !== '—' && <Text style={styles.statUnit}>{unit}</Text>}
+    <View style={styles.statSmallCard}>
+      <Ionicons name={icon as any} size={16} color={colors.brandPrimary} />
+      <View>
+        <Text style={styles.statSmallValue}>{value}<Text style={styles.statSmallUnit}>{unit}</Text></Text>
+        <Text style={styles.statSmallLabel}>{label}</Text>
       </View>
-      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function ModalField({
-  icon, label, value, onChange, placeholder, keyboardType,
-}: {
+function ModalField({ icon, label, value, onChange, placeholder, keyboardType }: {
   icon: string;
   label: string;
   value: string;
@@ -433,206 +332,77 @@ function ModalField({
         <Text style={styles.fieldLabel}>{label}</Text>
       </View>
       <TextInput
-        style={styles.inputBox}
+        style={[styles.inputBox, { color: colors.textPrimary }]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
         keyboardType={keyboardType}
-        // @ts-ignore
-        color={colors.textPrimary}
       />
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  inner: { flex: 1, paddingHorizontal: 20 },
-
-  // Header
+  inner: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '900',
-    fontStyle: 'italic',
     color: colors.textPrimary,
+    letterSpacing: -1,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  targetsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: colors.brandPrimary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 22,
-  },
-  targetsBtnText: { fontSize: 13, fontWeight: '700', color: colors.brandPrimary },
   logBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: colors.brandPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
   },
-  logBtnText: { fontSize: 13, fontWeight: '700', color: colors.background },
-
-  scroll: { paddingBottom: 40 },
-
-  // Weight hero card
-  weightHero: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  weightLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: colors.textMuted,
-    marginBottom: 8,
-  },
-  weightValue: {
-    fontSize: 54,
-    fontWeight: '900',
-    color: colors.textPrimary,
-    letterSpacing: -2,
-    lineHeight: 58,
-  },
-  weightDate: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
-
-  // Stats grid
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
+  logBtnText: { fontSize: 14, fontWeight: '800', color: colors.background },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
+  sectionHeader: { marginTop: 20, marginBottom: 12 },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  statSmallCard: {
     flex: 1,
     minWidth: '45%',
     backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 16,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 6 },
-  statValue: { fontSize: 22, fontWeight: '900', color: colors.textPrimary },
-  statUnit: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-
-  // Section
-  section: { marginBottom: 24 },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-
-  // Chart
-  chartCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 88,
-    gap: 4,
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
-  },
-  bar: {
-    width: '70%',
-    backgroundColor: colors.brandPrimary,
-    borderRadius: 4,
-    opacity: 0.85,
-  },
-  barLabel: { fontSize: 9, color: colors.textMuted, textAlign: 'center' },
-  chartLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  chartLegendText: { fontSize: 12, color: colors.textMuted },
-
-  // History
-  histRow: {
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  histLeft: { flex: 1 },
-  histDate: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  histNotes: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  histRight: { alignItems: 'flex-end', gap: 5 },
-  histWeight: { fontSize: 16, fontWeight: '700', color: colors.brandPrimary },
-  histPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end' },
-  pill: {
-    fontSize: 11,
-    color: colors.textMuted,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-
-  // Empty state
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
     gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-    maxWidth: 240,
-    lineHeight: 20,
+  statSmallValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  statSmallUnit: { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginLeft: 2 },
+  statSmallLabel: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  targetsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+    marginTop: 10,
   },
+  targetsBtnText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
 
-  // Modal
+  // Modal styles (Existing)
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: 'row',
@@ -647,28 +417,12 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   modalSave: { fontSize: 16, fontWeight: '700', color: colors.brandPrimary, minWidth: 60, textAlign: 'right' },
   modalScroll: { padding: 20, paddingBottom: 60 },
-
-  unitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  unitToggle: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: 3,
-  },
-  unitBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
+  unitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  unitToggle: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 10, padding: 3 },
+  unitBtn: { paddingHorizontal: 20, paddingVertical: 7, borderRadius: 8 },
   unitBtnActive: { backgroundColor: colors.brandPrimary },
   unitBtnText: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
   unitBtnTextActive: { color: colors.background },
-
   fieldBlock: { marginBottom: 16 },
   fieldHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
@@ -680,7 +434,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: colors.textPrimary,
   },
   notesBox: { height: 88, textAlignVertical: 'top', paddingTop: 14 },
 });

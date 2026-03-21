@@ -2,14 +2,14 @@
  * Main Navigator
  *
  * Bottom tab navigator for authenticated + onboarded users.
- * 5 tabs: Dashboard · Workout · Progress · Body · Log
- *
- *   Dashboard  →  DashboardScreen   (home icon)
- *   Workout    →  WorkoutScreen     (barbell icon)
- *   Progress   →  ProgressScreen    (trending-up icon)
- *   Body       →  BodyNavigator     (body icon — stack: Body + Targets)
- *   Log        →  LogScreen         (calendar icon)
- */
+- * 5 tabs: Workout · Progress · Body · Log
+- *
+- *   Workout    →  DashboardScreen   (barbell icon - renamed from Dashboard)
+- *   Session    →  WorkoutScreen     (flash icon - renamed from Workout)
+- *   Targets    →  ProgressScreen    (disc icon - renamed from Progress)
+- *   Body       →  BodyNavigator     (body icon — stack: Body + Targets)
+- *   Log        →  LogScreen         (calendar icon)
+- */
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,8 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { MainTabParamList } from './types';
 
-import DashboardScreen from '../screens/dashboard/DashboardScreen';
-import WorkoutScreen from '../screens/workout/WorkoutScreen';
+import WorkoutNavigator from './WorkoutNavigator';
+import SessionNavigator from './SessionNavigator';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import BodyNavigator from './BodyNavigator';
 import LogScreen from '../screens/workout/LogScreen';
@@ -31,9 +31,9 @@ const TAB_ICONS: Record<
   keyof MainTabParamList,
   { active: React.ComponentProps<typeof Ionicons>['name']; inactive: React.ComponentProps<typeof Ionicons>['name'] }
 > = {
-  Dashboard: { active: 'home',        inactive: 'home-outline' },
-  Workout:   { active: 'barbell',     inactive: 'barbell-outline' },
-  Progress:  { active: 'trending-up', inactive: 'trending-up-outline' },
+  Dashboard: { active: 'barbell',     inactive: 'barbell-outline' },
+  Workout:   { active: 'flash',       inactive: 'flash-outline' },
+  Progress:  { active: 'disc',        inactive: 'disc-outline' },
   Body:      { active: 'body',        inactive: 'body-outline' },
   Log:       { active: 'calendar',    inactive: 'calendar-outline' },
 };
@@ -67,9 +67,9 @@ export default function MainNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Workout"   component={WorkoutScreen} />
-      <Tab.Screen name="Progress"  component={ProgressScreen} />
+      <Tab.Screen name="Dashboard" component={WorkoutNavigator} options={{ tabBarLabel: 'Workout' }} />
+      <Tab.Screen name="Workout"   component={SessionNavigator} options={{ tabBarLabel: 'Session' }} />
+      <Tab.Screen name="Progress"  component={ProgressScreen} options={{ tabBarLabel: 'Targets' }} />
       <Tab.Screen
         name="Body"
         component={BodyNavigator}

@@ -89,6 +89,7 @@ export const WorkoutService = {
           const suggestion = await this.calculateSuggestedWeight(userId, p.exerciseId, p.targetRepRange || '10', bestLifts);
           return {
             ...p,
+            exercise: p.exercise, // Explicitly preserve the exercise relation
             suggestedWeight: suggestion.weight,
             weightUnit: suggestion.unit,
           };

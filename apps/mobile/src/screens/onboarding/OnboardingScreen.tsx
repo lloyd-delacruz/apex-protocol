@@ -63,7 +63,7 @@ const OptionCard = ({
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
-const Step1Welcome = ({ onNext }: StepProps) => (
+const StepWelcome = ({ onNext }: StepProps) => (
   <View style={styles.stepContainer}>
     <View style={styles.heroBadge}>
       <Text style={styles.heroBadgeText}>AP</Text>
@@ -79,7 +79,7 @@ const Step1Welcome = ({ onNext }: StepProps) => (
   </View>
 );
 
-const Step2Goal = ({ onNext }: StepProps) => {
+const StepFitnessGoal = ({ onNext }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options: { label: string; value: CoreGoal }[] = [
     { label: 'Maximum Strength', value: 'strength' },
@@ -114,7 +114,7 @@ const Step2Goal = ({ onNext }: StepProps) => {
   );
 };
 
-const Step3Consistency = ({ onNext, onPrev }: StepProps) => {
+const StepConsistency = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options: { label: string; value: Consistency }[] = [
     { label: 'Brand New', value: 'brand_new' },
@@ -153,7 +153,7 @@ const Step3Consistency = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step4Experience = ({ onNext, onPrev }: StepProps) => {
+const StepExperienceLevel = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options: { label: string; value: ExperienceLevel }[] = [
     { label: 'Beginner', value: 'beginner' },
@@ -190,7 +190,7 @@ const Step4Experience = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step5Environment = ({ onNext, onPrev }: StepProps) => {
+const StepEnvironment = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options: { label: string; value: Environment }[] = [
     { label: 'Commercial Gym', value: 'commercial_gym' },
@@ -229,7 +229,7 @@ const Step5Environment = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step6Equipment = ({ onNext, onPrev }: StepProps) => {
+const StepEquipment = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options = [
     'Barbell', 'Dumbbells', 'Kettlebells', 'Pull-up Bar', 'Bench', 'Squat Rack', 'Cables', 'Leg Press'
@@ -275,7 +275,7 @@ const Step6Equipment = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step7CalibrationIntro = ({ onNext, onPrev }: StepProps) => (
+const StepCalibrationIntro = ({ onNext, onPrev }: StepProps) => (
   <View style={styles.stepContainer}>
     <View style={styles.heroBadge}>
       <Text style={styles.heroBadgeText}>⚡</Text>
@@ -294,7 +294,7 @@ const Step7CalibrationIntro = ({ onNext, onPrev }: StepProps) => (
   </View>
 );
 
-const Step8BestLifts = ({ onNext, onPrev }: StepProps) => {
+const StepBestLifts = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const lifts = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'];
 
@@ -337,7 +337,7 @@ const Step8BestLifts = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step9WeeklyGoal = ({ onNext, onPrev }: StepProps) => {
+const StepWeeklyGoal = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options = [2, 3, 4, 5, 6];
 
@@ -368,7 +368,7 @@ const Step9WeeklyGoal = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step10Notifications = ({ onNext, onPrev }: StepProps) => {
+const StepNotifications = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   return (
     <View style={styles.stepContainer}>
@@ -393,7 +393,7 @@ const Step10Notifications = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step11BodyStats = ({ onNext, onPrev }: StepProps) => {
+const StepBodyStats = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   return (
     <View style={styles.stepContainer}>
@@ -485,7 +485,7 @@ const Step11BodyStats = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step12Experience = ({ onNext, onPrev }: StepProps) => {
+const StepReferral = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const options = ['Instagram', 'TikTok', 'Facebook', 'ChatGPT', 'YouTube', 'Other'];
 
@@ -529,7 +529,7 @@ const Step12Experience = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step13Finalization = ({ onNext }: StepProps) => {
+const StepFinalization = ({ onNext }: StepProps) => {
   const { generateProgram } = useOnboarding();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -571,7 +571,7 @@ const Step13Finalization = ({ onNext }: StepProps) => {
   );
 };
 
-const Step14ProgramSummary = ({ onNext, onPrev }: StepProps) => {
+const StepProgramSummary = ({ onNext, onPrev }: StepProps) => {
   const { state } = useOnboarding();
   
   const programDetails = [
@@ -620,7 +620,7 @@ const Step14ProgramSummary = ({ onNext, onPrev }: StepProps) => {
   );
 };
 
-const Step15Paywall = () => {
+const StepPaywall = () => {
   const { completeOnboarding } = useOnboarding();
   const [billing, setBilling] = useState<'yearly' | 'monthly'>('yearly');
   const [completing, setCompleting] = useState(false);
@@ -707,21 +707,21 @@ export default function OnboardingScreen() {
 
   const renderStep = () => {
     switch (state.step) {
-      case 1:  return <Step1Welcome onNext={nextStep} />;
-      case 2:  return <Step2Goal onNext={nextStep} />;
-      case 3:  return <Step3Consistency onNext={nextStep} onPrev={prevStep} />;
-      case 4:  return <Step4Experience onNext={nextStep} onPrev={prevStep} />;
-      case 5:  return <Step9WeeklyGoal onNext={nextStep} onPrev={prevStep} />;
-      case 6:  return <Step5Environment onNext={nextStep} onPrev={prevStep} />;
-      case 7:  return <Step6Equipment onNext={nextStep} onPrev={prevStep} />;
-      case 8:  return <Step7CalibrationIntro onNext={nextStep} onPrev={prevStep} />;
-      case 9:  return <Step8BestLifts onNext={nextStep} onPrev={prevStep} />;
-      case 10: return <Step11BodyStats onNext={nextStep} onPrev={prevStep} />;
-      case 11: return <Step10Notifications onNext={nextStep} onPrev={prevStep} />;
-      case 12: return <Step12Experience onNext={nextStep} onPrev={prevStep} />;
-      case 13: return <Step13Finalization onNext={nextStep} />;
-      case 14: return <Step14ProgramSummary onNext={nextStep} onPrev={prevStep} />;
-      case 15: return <Step15Paywall />;
+      case 1:  return <StepWelcome onNext={nextStep} />;
+      case 2:  return <StepFitnessGoal onNext={nextStep} />;
+      case 3:  return <StepConsistency onNext={nextStep} onPrev={prevStep} />;
+      case 4:  return <StepExperienceLevel onNext={nextStep} onPrev={prevStep} />;
+      case 5:  return <StepEnvironment onNext={nextStep} onPrev={prevStep} />;
+      case 6:  return <StepEquipment onNext={nextStep} onPrev={prevStep} />;
+      case 7:  return <StepCalibrationIntro onNext={nextStep} onPrev={prevStep} />;
+      case 8:  return <StepBestLifts onNext={nextStep} onPrev={prevStep} />;
+      case 9:  return <StepWeeklyGoal onNext={nextStep} onPrev={prevStep} />;
+      case 10: return <StepNotifications onNext={nextStep} onPrev={prevStep} />;
+      case 11: return <StepBodyStats onNext={nextStep} onPrev={prevStep} />;
+      case 12: return <StepReferral onNext={nextStep} onPrev={prevStep} />;
+      case 13: return <StepFinalization onNext={nextStep} />;
+      case 14: return <StepProgramSummary onNext={nextStep} onPrev={prevStep} />;
+      case 15: return <StepPaywall />;
       default: return null;
     }
   };

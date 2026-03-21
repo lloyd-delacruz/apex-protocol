@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Image,
+  Dimensions,
+  Animated,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { DashboardStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -21,45 +27,100 @@ import { useTodayWorkout, useTrainingHistory } from '../../hooks/useWorkout';
 import { useProgress } from '../../hooks/useProgress';
 import { useProfile } from '../../hooks/useProfile';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const { width, height } = Dimensions.get('window');
 
-interface RecentSession {
-  sessionDate: string;
-  workoutDay?: { workoutType: string } | null;
-  durationSec?: number;
-  totalVolume?: number;
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type DashState = 'loading' | 'no-program' | 'rest' | 'ready' | 'error';
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, accentColor = colors.textPrimary }: {
-  label: string; value: string; sub?: string; accentColor?: string;
+function Pillar({ label, icon, onPress }: { label: string; icon?: string; onPress?: () => void }) {
+  return (
+    <TouchableOpacity style={styles.pillar} onPress={onPress} activeOpacity={0.7}>
+      <Text style={styles.pillarLabel}>{label}</Text>
+      <Ionicons name="chevron-down" size={12} color={colors.textMuted} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
+  );
+}
+
+function ExerciseCard({ 
+  exercise, 
+  index, 
+  isLast, 
+  isFocus, 
+  onMenuPress 
+}: { 
+  exercise: any; 
+  index: number; 
+  isLast: boolean; 
+  isFocus: boolean;
+  onMenuPress: () => void;
 }) {
   return (
-    <View style={styles.statCard}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, { color: accentColor }]}>{value}</Text>
-      {sub && <Text style={styles.statSub}>{sub}</Text>}
+    <View style={styles.exerciseCardContainer}>
+      {/* Connector Line */}
+      {!isLast && <View style={styles.connectorLine} />}
+      
+      <View style={styles.exerciseCardInner}>
+        {/* Thumbnail Section */}
+        <View style={styles.thumbnailWrapper}>
+          <Image 
+            source={{ uri: exercise.exercise.mediaUrl || 'https://via.placeholder.com/150' }} 
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+          {/* Muscle Badge Overlay */}
+          <View style={styles.muscleBadge}>
+            <MaterialCommunityIcons 
+              name={getMuscleIcon(exercise.exercise.muscleGroup)} 
+              size={12} 
+              color="#fff" 
+            />
+          </View>
+        </View>
+
+        {/* Info Section */}
+        <View style={styles.exerciseInfo}>
+          {isFocus && <Text style={styles.focusLabel}>FOCUS EXERCISE</Text>}
+          <Text style={styles.exerciseName}>{exercise.exercise.name}</Text>
+          <Text style={styles.exerciseStats}>
+            {exercise.targetSets || 3} sets • {exercise.targetRepRange || '8-12'} reps • {exercise.suggestedWeight || 0} {exercise.weightUnit || 'lb'}
+          </Text>
+        </View>
+
+        {/* Menu Action */}
+        <TouchableOpacity onPress={onMenuPress} style={styles.moreIcon}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
+function getMuscleIcon(muscle: string | null): any {
+  const m = muscle?.toLowerCase() || '';
+  if (m.includes('chest')) return 'human-handsdown';
+  if (m.includes('back')) return 'human-handsup';
+  if (m.includes('leg') || m.includes('quad') || m.includes('hamstring')) return 'human-male';
+  if (m.includes('shoulder')) return 'human-handsup';
+  if (m.includes('arm') || m.includes('bicep') || m.includes('tricep')) return 'arm-flex';
+  if (m.includes('abs') || m.includes('core')) return 'human-male-board';
+  return 'barbell';
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
-export default function HomeScreen() {
-  const navigation = useNavigation();
+export default function DashboardScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<DashboardStackParamList>>();
   const { user: authUser } = useAuth();
   const { data: todayWorkout, loading: loadingWorkout, error: workoutError, refresh: refreshWorkout } = useTodayWorkout();
-  const { data: analytics, refresh: refreshAnalytics } = useProgress();
-  const { sessions: rawHistory, refresh: refreshHistory } = useTrainingHistory(3);
   const { profile } = useProfile();
+  
   const [refreshing, setRefreshing] = useState(false);
-  const [generating, setGenerating] = useState(false);
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<any>(null);
+  const [workoutMenuVisible, setWorkoutMenuVisible] = useState(false);
 
   const dashState = useMemo<DashState>(() => {
     if (loadingWorkout) return 'loading';
@@ -69,59 +130,46 @@ export default function HomeScreen() {
     return 'ready';
   }, [loadingWorkout, workoutError, todayWorkout]);
 
-  const recentSessions = useMemo<RecentSession[]>(() => {
-    const seen = new Set<string>();
-    return rawHistory
-      .filter((log) => {
-        if (seen.has(log.sessionDate)) return false;
-        seen.add(log.sessionDate);
-        return true;
-      })
-      .map((log) => ({
-        sessionDate: log.sessionDate,
-        workoutDay: log.workoutDay,
-        totalVolume: undefined,
-      }));
-  }, [rawHistory]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.allSettled([refreshWorkout(), refreshAnalytics(), refreshHistory()]);
+    await Promise.allSettled([refreshWorkout()]);
     setRefreshing(false);
-  }, [refreshWorkout, refreshAnalytics, refreshHistory]);
-
-  // Generate program for users who don't have one
-  const handleGenerateProgram = useCallback(async () => {
-    setGenerating(true);
-    try {
-      const genRes = await api.request<{ program: { id: string } }>('POST', '/api/programs/generate', {
-        goals: profile?.goal ? [profile.goal] : ['hypertrophy'],
-        experienceLevel: profile?.experience ?? 'intermediate',
-        daysPerWeek: profile?.workoutsPerWeek ?? 4,
-        equipment: ['Barbell', 'Dumbbells', 'Bench', 'Cables'],
-      });
-
-      if (genRes.success && genRes.data?.program?.id) {
-        await api.request('POST', `/api/programs/${genRes.data.program.id}/assign`, {});
-        Alert.alert('Program Created!', 'Your training program has been generated. Pull down to refresh.');
-        refreshWorkout();
-      } else {
-        Alert.alert('Error', genRes.error ?? 'Failed to generate program');
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to generate program');
-    } finally {
-      setGenerating(false);
-    }
   }, [refreshWorkout]);
 
-  const userName = authUser?.name ?? authUser?.email ?? 'Athlete';
-  const streak = analytics?.adherence?.streak ?? 0;
-  const weeklyVolume = analytics?.weeklyVolume ?? [];
-  const latestVol = weeklyVolume[weeklyVolume.length - 1]?.volume ?? 0;
-  const sessions = analytics?.adherence?.sessionsLast4Weeks ?? 0;
+  const workoutDay = todayWorkout?.workoutDay;
+  const exercises = workoutDay?.exercisePrescriptions ?? [];
+  const muscleGroups = useMemo(() => {
+    const groups = new Set(exercises.map(ex => ex.exercise.muscleGroup).filter(Boolean));
+    return groups.size;
+  }, [exercises]);
 
   const Background = () => <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />;
+
+  const renderHeader = (isEmpty = false) => (
+    <View style={styles.header}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.workoutTitle}>
+          {isEmpty ? (dashState === 'rest' ? 'Recovery Day' : 'Apex Protocol') : workoutDay?.workoutType}
+        </Text>
+        {!isEmpty && (
+          <Text style={styles.workoutSubtitle}>
+            {exercises.length} Exercises • {muscleGroups} Muscles
+          </Text>
+        )}
+      </View>
+      {!isEmpty && (
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.swapBtn}>
+            <Ionicons name="swap-horizontal" size={16} color="#fff" />
+            <Text style={styles.swapBtnText}>Swap</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setWorkoutMenuVisible(true)} style={styles.moreHeaderIcon}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
 
   // ═══ Loading ═══════════════════════════════════════════════════════════════
   if (dashState === 'loading') {
@@ -150,188 +198,187 @@ export default function HomeScreen() {
     );
   }
 
-  const workoutDay = todayWorkout?.workoutDay;
-  const exercises = workoutDay?.exercisePrescriptions ?? [];
-
   return (
     <View style={styles.container}>
       <Background />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        
+        {/* Top Mini Header (My Plan) */}
+        <View style={styles.miniHeader}>
+          <TouchableOpacity style={styles.planSelector} onPress={() => navigation.navigate('PlanDetails')}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{authUser?.name?.substring(0, 1).toUpperCase() || 'A'}</Text>
+            </View>
+            <Text style={styles.planText}>My Plan</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.brandPrimary} />
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandPrimary} />}
         >
-          {/* ── Header ──────────────────────────────── */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>{greeting},</Text>
-              <Text style={styles.userName}>{userName}</Text>
-            </View>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>AP</Text>
-            </View>
-          </View>
+          {dashState === 'ready' && workoutDay ? (
+            <>
+              {/* Main Header */}
+              {renderHeader()}
 
-          {/* ── Stats row ───────────────────────────── */}
-          <View style={styles.statsRow}>
-            <StatCard label="Streak" value={`${streak}d`} accentColor={colors.brandPrimary} />
-            <StatCard label="Sessions" value={sessions > 0 ? `${sessions}` : '—'} sub="LAST 30D" />
-            <StatCard
-              label="Volume"
-              value={latestVol > 0 ? `${(latestVol / 1000).toFixed(1)}k` : '—'}
-              sub="THIS WEEK"
-              accentColor={colors.accentSecondary}
-            />
-          </View>
-
-          {/* ═══ No Program State ═══════════════════════════════════════════ */}
-          {dashState === 'no-program' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Get Started</Text>
-              <View style={styles.noProgramCard}>
-                <View style={styles.noProgramIcon}>
-                  <Ionicons name="barbell-outline" size={40} color={colors.brandPrimary} />
-                </View>
-                <Text style={styles.noProgramTitle}>No Program Assigned</Text>
-                <Text style={styles.noProgramSub}>
-                  Generate a personalized training program based on your goals, experience, and available equipment.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.primaryBtn, generating && { opacity: 0.5 }]}
-                  onPress={handleGenerateProgram}
-                  disabled={generating}
-                >
-                  {generating ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>GENERATE PROGRAM</Text>
-                  )}
-                </TouchableOpacity>
-
-                <Text style={styles.noProgramHint}>
-                  Or navigate to the Workout tab to start a quick session
-                </Text>
+              {/* Filters */}
+              <View style={styles.filtersRow}>
+                <Pillar label="1h 15m" />
+                <Pillar label="Equipment" />
               </View>
-            </View>
-          )}
 
-          {/* ═══ Rest Day State ═════════════════════════════════════════════ */}
-          {dashState === 'rest' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Today's Schedule</Text>
-              <View style={styles.restCard}>
-                <Text style={{ fontSize: 48, marginBottom: 16 }}>🌙</Text>
-                <Text style={styles.restTitle}>Recovery Protocol</Text>
-                <Text style={styles.restSub}>
-                  Rest is where the growth happens.{'\n'}See you tomorrow, champion.
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* ═══ Workout Ready State ═══════════════════════════════════════ */}
-          {dashState === 'ready' && workoutDay && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Today's Workout</Text>
-              <View style={styles.todayCard}>
-                <View style={styles.todayCardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.todayCardTitle}>{workoutDay.workoutType}</Text>
-                    <Text style={styles.todayCardSub}>
-                      Week {todayWorkout?.currentWeek?.absoluteWeekNumber} · {exercises.length} exercises · {workoutDay.phase}
-                    </Text>
-                  </View>
-                  <View style={styles.statusPill}>
-                    <Text style={styles.statusPillText}>Scheduled</Text>
-                  </View>
-                </View>
-
-                {exercises.slice(0, 5).map((ex, idx) => (
-                  <View key={ex.id} style={styles.exerciseRow}>
-                    <View style={styles.exerciseIndex}>
-                      <Text style={styles.exerciseIndexText}>{idx + 1}</Text>
-                    </View>
-                    <View style={styles.exerciseInfo}>
-                      <Text style={styles.exerciseName}>{ex.exercise.name}</Text>
-                      <Text style={styles.exerciseSub}>
-                        {ex.targetSets ? `${ex.targetSets} sets · ` : ''}{ex.targetRepRange ?? '8-12'} reps
-                        {ex.exercise.muscleGroup ? ` · ${ex.exercise.muscleGroup}` : ''}
-                      </Text>
-                    </View>
-                  </View>
+              {/* Exercise List */}
+              <View style={styles.listContainer}>
+                {exercises.map((ex, idx) => (
+                  <ExerciseCard 
+                    key={ex.id} 
+                    exercise={ex} 
+                    index={idx} 
+                    isLast={idx === exercises.length - 1}
+                    isFocus={idx === 0}
+                    onMenuPress={() => {
+                      setSelectedExercise(ex);
+                      setMenuVisible(true);
+                    }}
+                  />
                 ))}
 
-                {exercises.length > 5 && (
-                  <Text style={styles.moreExercises}>+{exercises.length - 5} more exercises</Text>
-                )}
-
-                <TouchableOpacity
-                  style={styles.igniteBtn}
-                  activeOpacity={0.8}
-                  onPress={() => navigation.navigate('Workout' as never)}
-                >
-                  <Ionicons name="flash" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.igniteBtnText}>IGNITE PROTOCOL</Text>
+                {/* Add Exercise Card */}
+                <TouchableOpacity style={styles.addExerciseCard}>
+                  <View style={styles.addIconContainer}>
+                    <Ionicons name="add" size={24} color={colors.brandPrimary} />
+                  </View>
+                  <Text style={styles.addExerciseText}>Add Exercise</Text>
                 </TouchableOpacity>
               </View>
+            </>
+          ) : (
+            <View style={styles.emptyContainer}>
+               {renderHeader(true)}
+               
+               {dashState === 'no-program' ? (
+                 <View style={styles.emptyStateCard}>
+                   <View style={styles.emptyIconCircle}>
+                     <Ionicons name="sparkles" size={32} color={colors.brandPrimary} />
+                   </View>
+                   <Text style={styles.emptyStateTitle}>Welcome to Apex</Text>
+                   <Text style={styles.emptyStateSub}>
+                     You haven't assigned a program yet. Generate your protocol to start training.
+                   </Text>
+                   <TouchableOpacity 
+                     style={styles.primaryBtn} 
+                     onPress={() => navigation.navigate('Onboarding' as never)}
+                   >
+                     <Text style={styles.primaryBtnText}>GET STARTED</Text>
+                   </TouchableOpacity>
+                 </View>
+               ) : (
+                 <View style={styles.emptyStateCard}>
+                   <View style={styles.emptyIconCircle}>
+                     <Ionicons name="moon" size={32} color={colors.accentSecondary} />
+                   </View>
+                   <Text style={styles.emptyStateTitle}>Rest & Recover</Text>
+                   <Text style={styles.emptyStateSub}>
+                     Rest is where the growth happens. Use today to focus on nutrition and mobility.
+                   </Text>
+                   <TouchableOpacity 
+                     style={[styles.primaryBtn, { backgroundColor: colors.surfaceElevated }]}
+                     onPress={() => navigation.navigate('Log' as never)}
+                   >
+                     <Text style={styles.primaryBtnText}>VIEW HISTORY</Text>
+                   </TouchableOpacity>
+                 </View>
+               )}
             </View>
           )}
 
-          {/* ── Recent Sessions ─────────────────────── */}
-          {recentSessions.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recent Sessions</Text>
-              {recentSessions.slice(0, 3).map((s, i) => (
-                <View key={i} style={styles.sessionRow}>
-                  <View style={styles.sessionDot} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sessionType}>
-                      {s.workoutDay?.workoutType ?? 'Workout'}
-                    </Text>
-                    <Text style={styles.sessionDate}>
-                      {new Date(s.sessionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
-                  </View>
-                  {s.totalVolume != null && s.totalVolume > 0 && (
-                    <Text style={styles.sessionVolume}>
-                      {(s.totalVolume / 1000).toFixed(1)}k vol
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* ── Quick Actions ──────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.quickActionsRow}>
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                onPress={() => navigation.navigate('Workout' as never)}
-              >
-                <Ionicons name="barbell-outline" size={24} color={colors.brandPrimary} />
-                <Text style={styles.quickActionLabel}>Start{'\n'}Workout</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                onPress={() => navigation.navigate('Progress' as never)}
-              >
-                <Ionicons name="stats-chart-outline" size={24} color={colors.accentSecondary} />
-                <Text style={styles.quickActionLabel}>View{'\n'}Progress</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionCard}>
-                <Ionicons name="trophy-outline" size={24} color={colors.warning} />
-                <Text style={styles.quickActionLabel}>Personal{'\n'}Records</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={{ height: 40 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
+
+        {/* Sticky Start Button */}
+        {dashState === 'ready' && (
+          <View style={styles.stickyFooter}>
+            <TouchableOpacity 
+              style={styles.startBtn} 
+              onPress={() => navigation.navigate('Workout' as never)}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.startBtnText}>Start Workout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </SafeAreaView>
+
+      {/* Workout Menu Modal */}
+      <Modal visible={workoutMenuVisible} transparent animationType="slide">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setWorkoutMenuVisible(false)}
+        >
+          <View style={styles.bottomSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Workout Options</Text>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="bookmark-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>Save workout</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="repeat-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>Build superset/circuit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="share-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>Share workout link</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetAction} onPress={() => { setWorkoutMenuVisible(false); refreshWorkout(); }}>
+              <Ionicons name="refresh-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>Refresh workout</Text>
+            </TouchableOpacity>
+            
+            <View style={{ height: 40 }} />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Exercise Menu Modal */}
+      <Modal visible={menuVisible} transparent animationType="slide">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.bottomSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{selectedExercise?.exercise?.name}</Text>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="information-circle-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>View Exercise Details</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="swap-horizontal-outline" size={24} color="#fff" />
+              <Text style={styles.sheetActionText}>Replace Exercise</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetAction}>
+              <Ionicons name="trash-outline" size={24} color={colors.danger} />
+              <Text style={[styles.sheetActionText, { color: colors.danger }]}>Remove from Workout</Text>
+            </TouchableOpacity>
+            
+            <View style={{ height: 40 }} />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -340,174 +387,308 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  centeredState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
-  scroll: { paddingHorizontal: 16, paddingBottom: 24 },
-  header: {
+  centeredState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, minHeight: 300 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 100 },
+  miniHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  planSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    paddingBottom: 20,
+    gap: 10,
   },
-  greeting: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  userName: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
-  logoContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFD700', // Yellow as in screenshot
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.brandPrimary,
   },
-  logoText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+  avatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#000',
   },
-  statLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statValue: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: 4 },
-  statSub: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 },
-
-  // Empty / Error states
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: 16 },
-  emptySub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 22 },
-  primaryBtn: {
-    backgroundColor: colors.brandPrimary,
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 14,
+  planText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  workoutTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+  },
+  workoutSubtitle: {
+    fontSize: 15,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 24,
-    width: '100%',
+    gap: 12,
   },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', fontStyle: 'italic' },
-
-  // No program card
-  noProgramCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+  swapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  swapBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  moreHeaderIcon: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
+  pillar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 30,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  pillarLabel: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  listContainer: {
+    paddingBottom: 20,
+  },
+  exerciseCardContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  connectorLine: {
+    position: 'absolute',
+    left: 40,
+    top: 60,
+    bottom: -40,
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: -1,
+  },
+  exerciseCardInner: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  noProgramIcon: {
+  thumbnailWrapper: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 194, 255, 0.08)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  muscleBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  exerciseInfo: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  focusLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.brandPrimary,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  exerciseName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  exerciseStats: {
+    fontSize: 14,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  moreIcon: {
+    padding: 8,
+  },
+  addExerciseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  addExerciseText: {
+    marginLeft: 16,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.brandPrimary,
+  },
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  startBtn: {
+    backgroundColor: colors.brandPrimary,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.brandPrimary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  startBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    textTransform: 'uppercase',
+  },
+  // Modal / Sheet
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  sheetAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  sheetActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  // Empty states
+  emptyContainer: { flex: 1 },
+  emptyStateCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginTop: 20,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  noProgramTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
-  noProgramSub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 22 },
-  noProgramHint: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 16 },
-
-  // Rest day
-  restCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 40,
-    alignItems: 'center',
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  restTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  restSub: { fontSize: 14, color: colors.textMuted, marginTop: 8, textAlign: 'center', lineHeight: 22 },
-
-  // Today's workout card
-  todayCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 20,
+  emptyStateSub: {
+    fontSize: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
   },
-  todayCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  todayCardTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
-  todayCardSub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  statusPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-    backgroundColor: 'rgba(0, 194, 255, 0.1)',
-  },
-  statusPillText: { fontSize: 11, fontWeight: '700', color: colors.brandPrimary, textTransform: 'uppercase' },
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  exerciseIndex: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exerciseIndexText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  exerciseInfo: { flex: 1 },
-  exerciseName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  exerciseSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  moreExercises: { fontSize: 13, color: colors.brandPrimary, fontWeight: '600', textAlign: 'center', paddingVertical: 12 },
-  igniteBtn: {
+  emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+  emptySub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 22 },
+  primaryBtn: {
     backgroundColor: colors.brandPrimary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
     borderRadius: 14,
-    paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 16,
+    width: '100%',
   },
-  igniteBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', fontStyle: 'italic' },
-
-  // Recent sessions
-  sessionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
-  },
-  sessionDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.brandPrimary,
-  },
-  sessionType: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  sessionDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  sessionVolume: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
-
-  // Quick actions
-  quickActionsRow: { flexDirection: 'row', gap: 12 },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
-    padding: 20,
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  quickActionLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted, textAlign: 'center', lineHeight: 16 },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', fontStyle: 'italic' },
 });
