@@ -216,10 +216,17 @@ export default function TargetsScreen() {
           {/* ── History Section ── */}
           <View style={styles.historySection}>
             <Text style={styles.sectionTitle}>History</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyScroll}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.historyScroll}
+              decelerationRate="fast"
+            >
               {MOCK_HISTORY.map((h, i) => (
                 <View key={i} style={styles.historyItem}>
-                  <WeeklySetHexagon percentage={h.percentage} size={60} strokeWidth={4} />
+                  <View style={styles.historyHexWrap}>
+                    <WeeklySetHexagon percentage={h.percentage} size={64} strokeWidth={3} />
+                  </View>
                   <Text style={styles.historyDate}>{h.date}</Text>
                 </View>
               ))}
@@ -368,121 +375,41 @@ const styles = StyleSheet.create({
 
   // History Section
   historySection: {
-    marginBottom: 40,
+    marginBottom: 48,
+    paddingTop: 8,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     fontStyle: 'italic',
     color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
   historyScroll: {
-    gap: 20,
-    paddingRight: 20,
+    paddingRight: 24,
+    gap: 12,
   },
   historyItem: {
     alignItems: 'center',
-    gap: 8,
+    width: 80,
+  },
+  historyHexWrap: {
+    padding: 2,
+    marginBottom: 10,
   },
   historyDate: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '800',
     color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   divider: {
     height: 1,
     backgroundColor: colors.border,
     marginBottom: 24,
-  },
-
-  manageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  manageTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-
-  // Old Sections
-  section: { marginBottom: 24 },
-  sectionHeader: { marginBottom: 12 },
-  sectionTitleSmall: {
-    fontSize: 18,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    color: colors.textPrimary,
-  },
-
-  // Target card
-  targetCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  targetCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  targetIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,194,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  targetIconWrapDone: { backgroundColor: 'rgba(16,185,129,0.12)' },
-  targetInfo: { flex: 1 },
-  targetName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  targetMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  targetGoalText: { color: colors.brandPrimary, fontWeight: '700' },
-  targetSetHint: { fontSize: 12, color: colors.brandPrimary, marginTop: 2 },
-  targetRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  targetPct: { fontSize: 14, fontWeight: '800', color: colors.brandPrimary },
-  targetPctDone: { color: colors.success },
-  progressTrack: {
-    height: 3,
-    backgroundColor: colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 3,
-    backgroundColor: colors.brandPrimary,
-    borderRadius: 2,
-  },
-  progressFillDone: { backgroundColor: colors.success },
-
-  emptyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 16,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyCardText: {
-    fontSize: 14,
-    color: colors.brandPrimary,
-    fontWeight: '600',
   },
 
   // Modal

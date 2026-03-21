@@ -12,11 +12,16 @@ interface WeeklySetHexagonProps {
 export const WeeklySetHexagon: React.FC<WeeklySetHexagonProps> = ({
   percentage,
   size = 200,
-  strokeWidth = 8,
+  strokeWidth: manualStrokeWidth,
 }) => {
+  const strokeWidth = manualStrokeWidth || Math.max(2, size / 20);
   const center = size / 2;
   const radius = (size - strokeWidth) / 2;
   
+  // Responsive font size: roughly 28% of the container size
+  const fontSize = Math.max(12, size * 0.28);
+  const letterSpacing = size > 100 ? -2 : -0.5;
+
   // Calculate hexagon points
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i < 6; i++) {
@@ -85,7 +90,7 @@ export const WeeklySetHexagon: React.FC<WeeklySetHexagonProps> = ({
         </G>
       </Svg>
       <View style={styles.content}>
-        <Text style={styles.percentage}>{Math.round(percentage)}%</Text>
+        <Text style={[styles.percentage, { fontSize, letterSpacing }]}>{Math.round(percentage)}%</Text>
       </View>
     </View>
   );
@@ -103,10 +108,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   percentage: {
-    fontSize: 56,
     fontWeight: '900',
     color: colors.textPrimary,
     fontStyle: 'italic',
-    letterSpacing: -2,
   },
 });
