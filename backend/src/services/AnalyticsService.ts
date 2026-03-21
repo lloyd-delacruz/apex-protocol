@@ -10,7 +10,7 @@ export const AnalyticsService = {
    * Returns: weekly volume, strength trends, adherence, recovery score.
    */
   async getDashboardAnalytics(userId: string) {
-    const [weeklyVolume, strengthTrends, adherence, recoveryScore, recentMetrics, statusBreakdown] =
+    const [weeklyVolume, strengthTrends, adherence, recoveryScore, recentMetrics, statusBreakdown, muscleAnalytics] =
       await Promise.all([
         computeWeeklyVolume(userId),
         computeStrengthTrends(userId),
@@ -18,6 +18,7 @@ export const AnalyticsService = {
         computeRecoveryScore(userId),
         MetricsRepository.findRecent(userId, 7),
         computeStatusBreakdown(userId),
+        computeMuscleAnalytics(userId),
       ]);
 
     return {
@@ -25,8 +26,9 @@ export const AnalyticsService = {
       strengthTrends,
       adherence,
       recoveryScore,
-      recentMetrics: recentMetrics.map(normaliseMetric),
+      recentMetrics: (recentMetrics as any[]).map(normaliseMetric),
       statusBreakdown,
+      muscleAnalytics,
     };
   },
 };
@@ -164,12 +166,12 @@ async function computeRecoveryScore(userId: string): Promise<number> {
     let sum = 0;
     let count = 0;
 
-    if (entry.sleepHours !== null) {
+    if (entry.sleepHours !== null && entry.sleepHours !== undefined) {
       sum += Math.min(100, Math.max(20, Number(entry.sleepHours) * 12.5));
       count++;
     }
-    if (entry.moodScore !== null) { sum += entry.moodScore * 10; count++; }
-    if (entry.trainingPerformanceScore !== null) { sum += entry.trainingPerformanceScore * 10; count++; }
+    if (entry.moodScore !== null && entry.moodScore !== undefined) { sum += entry.moodScore * 10; count++; }
+    if (entry.trainingPerformanceScore !== null && entry.trainingPerformanceScore !== undefined) { sum += entry.trainingPerformanceScore * 10; count++; }
 
     if (count > 0) scores.push(sum / count);
   }
@@ -183,6 +185,7 @@ function normaliseMetric(m: {
   id: string;
   entryDate: Date;
   bodyWeight: unknown;
+  bodyFat?: unknown;
   moodScore: number | null;
   sleepHours: unknown;
   trainingPerformanceScore: number | null;
@@ -191,6 +194,7 @@ function normaliseMetric(m: {
     id: m.id,
     date: m.entryDate.toISOString().split('T')[0],
     body_weight_kg: m.bodyWeight ? Number(m.bodyWeight) : null,
+    body_fat_pct: m.bodyFat ? Number(m.bodyFat) : null,
     mood: m.moodScore,
     sleep_hours: m.sleepHours ? Number(m.sleepHours) : null,
     training_performance: m.trainingPerformanceScore,
@@ -214,6 +218,87 @@ async function computeStatusBreakdown(userId: string) {
   }
 
   return counts;
+}
+
+/**
+ * Aggregate muscle-specific stats: recovery status, volume, and recent exercises.
+ */
+async function computeMuscleAnalytics(userId: string) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30); // Look at last 30 days for history
+
+  const logs = await prisma.trainingLog.findMany({
+    where: { userId, sessionDate: { gte: cutoff } },
+    include: { exercise: true },
+    orderBy: { sessionDate: 'desc' },
+  });
+
+  const muscleMap = new Map<string, {
+    name: string;
+    lastWorkedAt: Date | null;
+    totalSets: number;
+    recentExercises: string[];
+  }>();
+
+  // Define logical groups for the body diagram
+  const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'];
+  GROUPS.forEach(g => muscleMap.set(g, { name: g, lastWorkedAt: null, totalSets: 0, recentExercises: [] }));
+
+  // Mapping from ExerciseDB/Apex primaryMuscle to high-level groups
+  const TAXONOMY: Record<string, string> = {
+    'Pectorals': 'Chest',
+    'Lats': 'Back',
+    'Traps': 'Back',
+    'Upper Back': 'Back',
+    'Serratus Anterior': 'Back',
+    'Spine': 'Back',
+    'Delts': 'Shoulders',
+    'Biceps': 'Arms',
+    'Triceps': 'Arms',
+    'Forearms': 'Arms',
+    'Quads': 'Legs',
+    'Hamstrings': 'Legs',
+    'Glutes': 'Legs',
+    'Calves': 'Legs',
+    'Abductors': 'Legs',
+    'Adductors': 'Legs',
+    'Abs': 'Core',
+  };
+
+  const now = new Date();
+
+  for (const log of logs) {
+    const rawMuscle = log.exercise.primaryMuscle || 'Unknown';
+    const groupName = TAXONOMY[rawMuscle] || 'Other';
+    
+    if (groupName === 'Other') continue;
+
+    const group = muscleMap.get(groupName)!;
+    
+    // Update last worked
+    if (!group.lastWorkedAt || log.sessionDate > group.lastWorkedAt) {
+      group.lastWorkedAt = log.sessionDate;
+    }
+
+    // Update sets (assume 1 log entry = 1 group of sets, or calculate real sets)
+    // TrainingLog usually represents 1 exercise prescription entry with 4 possible rep fields.
+    const setCount = [log.set1Reps, log.set2Reps, log.set3Reps, log.set4Reps].filter(r => r !== null).length;
+    group.totalSets += setCount;
+
+    // Add to recent exercises (limit to 3 unique names)
+    if (group.recentExercises.length < 3 && !group.recentExercises.includes(log.exercise.name)) {
+      group.recentExercises.push(log.exercise.name);
+    }
+  }
+
+  return Array.from(muscleMap.values()).map(m => {
+    const isFresh = !m.lastWorkedAt || (now.getTime() - m.lastWorkedAt.getTime() > 48 * 60 * 60 * 1000);
+    return {
+      ...m,
+      isFresh,
+      lastWorkedAt: m.lastWorkedAt?.toISOString() || null,
+    };
+  });
 }
 
 /** Return "YYYY-Www" ISO week key for a date */

@@ -19,6 +19,7 @@ import BodyFatDetailScreen from '../screens/body/BodyFatDetailScreen';
 import BodyMeasurementsScreen from '../screens/body/BodyMeasurementsScreen';
 import BodyPhotosScreen from '../screens/body/BodyPhotosScreen';
 import BodyStatisticsScreen from '../screens/body/BodyStatisticsScreen';
+import MuscleDetailScreen from '../screens/body/MuscleDetailScreen';
 
 const Stack = createNativeStackNavigator<BodyStackParamList>();
 
@@ -32,6 +33,7 @@ export default function BodyNavigator() {
       <Stack.Screen name="BodyMeasurements" component={BodyMeasurementsScreen} />
       <Stack.Screen name="BodyPhotos"       component={BodyPhotosScreen} />
       <Stack.Screen name="BodyStatistics"   component={BodyStatisticsScreen} />
+      <Stack.Screen name="MuscleDetail"     component={MuscleDetailScreen} />
     </Stack.Navigator>
   );
 }

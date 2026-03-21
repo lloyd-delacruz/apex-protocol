@@ -280,6 +280,7 @@ model BodyMetric {
   userId                   String   @map("user_id")
   entryDate                DateTime @map("entry_date") @db.Date
   bodyWeight               Decimal? @map("body_weight") @db.Decimal(6, 2)
+  bodyFat                  Decimal? @map("body_fat") @db.Decimal(5, 2)
   bodyWeightUnit           String   @default("kg") @map("body_weight_unit") @db.VarChar(20)
   calories                 Int?
   proteinGrams             Int?     @map("protein_grams")

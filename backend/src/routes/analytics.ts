@@ -9,9 +9,13 @@ router.get('/dashboard', authenticateToken, async (req: AuthenticatedRequest, re
   try {
     const analytics = await AnalyticsService.getDashboardAnalytics(req.userId!);
     res.json({ success: true, data: analytics, error: null });
-  } catch (err: unknown) {
-    console.error('Analytics error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error', data: null });
+  } catch (err: any) {
+    console.error('[Analytics] Error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      data: null
+    });
   }
 });
 

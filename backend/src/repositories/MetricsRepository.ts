@@ -9,6 +9,7 @@ export interface UpsertMetricsInput {
   userId: string;
   entryDate: Date;
   bodyWeight?: number;
+  bodyFat?: number;
   bodyWeightUnit?: string;
   calories?: number;
   proteinGrams?: number;
@@ -24,10 +25,11 @@ export interface UpsertMetricsInput {
 
 export const MetricsRepository = {
   async upsert(data: UpsertMetricsInput) {
-    const payload = {
+    const payload: any = {
       userId: data.userId,
       entryDate: data.entryDate,
       bodyWeight: data.bodyWeight !== undefined ? new Decimal(data.bodyWeight) : undefined,
+      // bodyFat: data.bodyFat !== undefined ? new Decimal(data.bodyFat) : undefined,
       bodyWeightUnit: data.bodyWeightUnit,
       calories: data.calories,
       proteinGrams: data.proteinGrams,
@@ -49,6 +51,7 @@ export const MetricsRepository = {
       update: {
         // Only overwrite fields that were actually provided
         ...(data.bodyWeight !== undefined && { bodyWeight: new Decimal(data.bodyWeight) }),
+        // ...(data.bodyFat !== undefined && { bodyFat: new Decimal(data.bodyFat) }),
         ...(data.bodyWeightUnit !== undefined && { bodyWeightUnit: data.bodyWeightUnit }),
         ...(data.calories !== undefined && { calories: data.calories }),
         ...(data.proteinGrams !== undefined && { proteinGrams: data.proteinGrams }),
@@ -78,12 +81,31 @@ export const MetricsRepository = {
       if (endDate) (where['entryDate'] as Record<string, unknown>)['lte'] = endDate;
     }
 
+    const select = {
+      id: true,
+      userId: true,
+      entryDate: true,
+      bodyWeight: true,
+      bodyWeightUnit: true,
+      calories: true,
+      proteinGrams: true,
+      sleepHours: true,
+      hungerScore: true,
+      bingeUrgeScore: true,
+      moodScore: true,
+      trainingPerformanceScore: true,
+      notes: true,
+      createdAt: true,
+      updatedAt: true,
+    };
+
     const [metrics, total] = await Promise.all([
       prisma.bodyMetric.findMany({
         where,
         orderBy: { entryDate: 'desc' },
         take: Math.min(limit, 365),
         skip: offset,
+        select,
       }),
       prisma.bodyMetric.count({ where }),
     ]);
@@ -95,6 +117,23 @@ export const MetricsRepository = {
     return prisma.bodyMetric.findFirst({
       where: { userId },
       orderBy: { entryDate: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        entryDate: true,
+        bodyWeight: true,
+        bodyWeightUnit: true,
+        calories: true,
+        proteinGrams: true,
+        sleepHours: true,
+        hungerScore: true,
+        bingeUrgeScore: true,
+        moodScore: true,
+        trainingPerformanceScore: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   },
 
@@ -105,6 +144,23 @@ export const MetricsRepository = {
     return prisma.bodyMetric.findMany({
       where: { userId, entryDate: { gte: cutoff } },
       orderBy: { entryDate: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        entryDate: true,
+        bodyWeight: true,
+        bodyWeightUnit: true,
+        calories: true,
+        proteinGrams: true,
+        sleepHours: true,
+        hungerScore: true,
+        bingeUrgeScore: true,
+        moodScore: true,
+        trainingPerformanceScore: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   },
 };

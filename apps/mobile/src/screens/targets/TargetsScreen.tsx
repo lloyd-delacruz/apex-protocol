@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme/colors';
 
+// New Components
+import { IntroCard } from './components/IntroCard';
+import { WeeklySetHexagon } from './components/WeeklySetHexagon';
+import { MuscleTargetCard } from './components/MuscleTargetCard';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Target {
@@ -30,7 +35,17 @@ interface Target {
   unit: string;
 }
 
+interface MuscleTarget {
+  id: string;
+  title: string;
+  icon: string;
+  current: number;
+  target: number;
+  color: string;
+}
+
 const TARGETS_KEY = 'apex_targets_v1';
+const INTRO_HIDDEN_KEY = 'apex_targets_intro_hidden';
 
 const DEFAULT_TARGETS: Target[] = [
   { id: 'squat',    category: 'strength', name: 'Back Squat',    icon: 'barbell-outline',   current: null, goal: null, unit: 'kg' },
@@ -41,11 +56,27 @@ const DEFAULT_TARGETS: Target[] = [
   { id: 'bodyfat',  category: 'body',     name: 'Body Fat',      icon: 'body-outline',      current: null, goal: null, unit: '%'  },
 ];
 
+const MOCK_MUSCLE_TARGETS: MuscleTarget[] = [
+  { id: 'push', title: 'Push Muscles', icon: 'flash-outline', current: 0, target: 50, color: colors.brandPrimary },
+  { id: 'pull', title: 'Pull Muscles', icon: 'git-pull-request-outline', current: 0, target: 27, color: colors.accentSecondary },
+  { id: 'legs', title: 'Leg Muscles', icon: 'bicycle-outline', current: 0, target: 45, color: colors.success },
+];
+
+const MOCK_HISTORY = [
+  { date: 'Feb 21', percentage: 0 },
+  { date: 'Feb 28', percentage: 0 },
+  { date: 'Mar 7', percentage: 0 },
+  { date: 'Mar 14', percentage: 0 },
+];
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TargetsScreen() {
   const [targets, setTargets] = useState<Target[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+  
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Target | null>(null);
   const [formCurrent, setFormCurrent] = useState('');
@@ -54,11 +85,18 @@ export default function TargetsScreen() {
 
   const load = useCallback(async () => {
     try {
-      const raw = await AsyncStorage.getItem(TARGETS_KEY);
-      if (raw) {
-        setTargets(JSON.parse(raw));
-        setInitialized(true);
+      const [rawTargets, introHidden] = await Promise.all([
+        AsyncStorage.getItem(TARGETS_KEY),
+        AsyncStorage.getItem(INTRO_HIDDEN_KEY),
+      ]);
+      
+      if (rawTargets) {
+        setTargets(JSON.parse(rawTargets));
       }
+      if (introHidden === 'true') {
+        setShowIntro(false);
+      }
+      setInitialized(true);
     } catch {}
   }, []);
 
@@ -72,6 +110,11 @@ export default function TargetsScreen() {
   const initDefaults = async () => {
     setInitialized(true);
     await persist(DEFAULT_TARGETS);
+  };
+
+  const handleDismissIntro = async () => {
+    setShowIntro(false);
+    await AsyncStorage.setItem(INTRO_HIDDEN_KEY, 'true');
   };
 
   const openEdit = (target: Target) => {
@@ -114,107 +157,131 @@ export default function TargetsScreen() {
     ]);
   };
 
+  // Date range (mock for now: current week)
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - now.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    
+    const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(start)} – ${fmt(end)}`;
+  }, []);
+
   const strengthTargets = targets.filter(t => t.category === 'strength');
   const bodyTargets = targets.filter(t => t.category === 'body');
-  const anySet = targets.some(t => t.goal != null);
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0A0A0F', '#1A1A26']} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={styles.inner}>
+      <LinearGradient colors={['#0A0A0F', '#12121A']} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.inner} edges={['top']}>
 
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Targets</Text>
-          {initialized && (
-            <TouchableOpacity
-              style={styles.resetAllBtn}
-              onPress={() => {
-                Alert.alert('Reset All', 'Reset all targets to default?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Reset', style: 'destructive', onPress: initDefaults },
-                ]);
-              }}
-            >
-              <Ionicons name="refresh-outline" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+        >
+          {/* ── Intro Card ── */}
+          {showIntro && (
+            <IntroCard
+              onClose={handleDismissIntro}
+              onLearnMore={() => Alert.alert('Set Targets', 'Volume targets help you optimize your training frequency and intensity for maximum muscle growth.')}
+            />
           )}
-        </View>
 
-        {!initialized ? (
-          /* ── Empty / First-run state ── */
-          <View style={styles.emptyState}>
-            <View style={styles.iconBadge}>
-              <Ionicons name="flag-outline" size={48} color={colors.brandPrimary} />
-            </View>
-            <Text style={styles.emptyTitle}>Set Your Targets</Text>
-            <Text style={styles.emptySubtitle}>
-              Define strength and body targets to track your progress over time.
-            </Text>
-            <TouchableOpacity style={styles.initBtn} onPress={initDefaults} activeOpacity={0.85}>
-              <Text style={styles.initBtnText}>Set Up Targets</Text>
-            </TouchableOpacity>
+          {/* ── Weekly Set Targets Header ── */}
+          <View style={styles.mainHeader}>
+            <Text style={styles.mainTitle}>Weekly Set Targets</Text>
+            <Text style={styles.dateRange}>{dateRange}</Text>
           </View>
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scroll}
-          >
-            {/* ── Progress Summary ── */}
-            {anySet && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>TARGETS SET</Text>
-                <Text style={styles.summaryValue}>
-                  {targets.filter(t => t.goal != null).length} / {targets.length}
-                </Text>
-                <View style={styles.summaryTrack}>
-                  <View
-                    style={[
-                      styles.summaryFill,
-                      {
-                        width: `${(targets.filter(t => t.goal != null).length / targets.length) * 100}%` as DimensionValue,
-                      },
-                    ]}
-                  />
+
+          {/* ── Main Visualization ── */}
+          <View style={styles.vizSection}>
+            <WeeklySetHexagon percentage={0} size={220} />
+          </View>
+
+          {/* ── Muscle Group Cards ── */}
+          <View style={styles.muscleSection}>
+            {MOCK_MUSCLE_TARGETS.map(m => (
+              <MuscleTargetCard
+                key={m.id}
+                title={m.title}
+                icon={m.icon}
+                currentSets={m.current}
+                targetSets={m.target}
+                accentColor={m.color}
+                onPress={() => Alert.alert(m.title, 'History and detailed breakdown coming soon.')}
+              />
+            ))}
+          </View>
+
+          {/* ── History Section ── */}
+          <View style={styles.historySection}>
+            <Text style={styles.sectionTitle}>History</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyScroll}>
+              {MOCK_HISTORY.map((h, i) => (
+                <View key={i} style={styles.historyItem}>
+                  <WeeklySetHexagon percentage={h.percentage} size={60} strokeWidth={4} />
+                  <Text style={styles.historyDate}>{h.date}</Text>
                 </View>
-              </View>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* ── Old Targets (preserved as secondary) ── */}
+          <View style={styles.divider} />
+          
+          <TouchableOpacity 
+            style={styles.manageHeader}
+            onPress={() => Alert.alert('Manage Goals', 'Personal records and body composition tracking.')}
+          >
+            <Text style={styles.manageTitle}>Personal Benchmarks</Text>
+            <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* ── Strength Targets ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitleSmall}>Strength PRS</Text>
+            </View>
+            {strengthTargets.map(t => (
+              <TargetCard
+                key={t.id}
+                target={t}
+                onEdit={() => openEdit(t)}
+                onReset={() => resetTarget(t.id)}
+              />
+            ))}
+            {strengthTargets.length === 0 && (
+              <TouchableOpacity style={styles.emptyCard} onPress={initDefaults}>
+                <Ionicons name="add-circle-outline" size={24} color={colors.brandPrimary} />
+                <Text style={styles.emptyCardText}>Initialize Strength Targets</Text>
+              </TouchableOpacity>
             )}
+          </View>
 
-            {/* ── Strength Targets ── */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Strength Targets</Text>
-                <Text style={styles.sectionSub}>1-Rep Max Goals</Text>
-              </View>
-              {strengthTargets.map(t => (
-                <TargetCard
-                  key={t.id}
-                  target={t}
-                  onEdit={() => openEdit(t)}
-                  onReset={() => resetTarget(t.id)}
-                />
-              ))}
+          {/* ── Body Targets ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitleSmall}>Body Composition</Text>
             </View>
+            {bodyTargets.map(t => (
+              <TargetCard
+                key={t.id}
+                target={t}
+                onEdit={() => openEdit(t)}
+                onReset={() => resetTarget(t.id)}
+              />
+            ))}
+            {bodyTargets.length === 0 && (
+              <TouchableOpacity style={styles.emptyCard} onPress={initDefaults}>
+                <Ionicons name="add-circle-outline" size={24} color={colors.brandPrimary} />
+                <Text style={styles.emptyCardText}>Initialize Body Targets</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-            {/* ── Body Targets ── */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Body Targets</Text>
-                <Text style={styles.sectionSub}>Composition Goals</Text>
-              </View>
-              {bodyTargets.map(t => (
-                <TargetCard
-                  key={t.id}
-                  target={t}
-                  onEdit={() => openEdit(t)}
-                  onReset={() => resetTarget(t.id)}
-                />
-              ))}
-            </View>
-
-            <Text style={styles.hintText}>Tap any target to set your current value and goal.</Text>
-          </ScrollView>
-        )}
+        </ScrollView>
       </SafeAreaView>
 
       {/* ── Edit Modal ── */}
@@ -226,7 +293,6 @@ export default function TargetsScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={{ flex: 1 }}
             >
-              {/* Modal header */}
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setShowModal(false)}>
                   <Text style={styles.modalCancel}>Cancel</Text>
@@ -242,7 +308,6 @@ export default function TargetsScreen() {
                 contentContainerStyle={styles.modalScroll}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* Unit toggle — strength only */}
                 {editTarget?.category === 'strength' && (
                   <View style={styles.unitRow}>
                     <Text style={styles.fieldLabel}>Unit</Text>
@@ -262,7 +327,6 @@ export default function TargetsScreen() {
                   </View>
                 )}
 
-                {/* Current */}
                 <View style={styles.fieldBlock}>
                   <View style={styles.fieldHeaderRow}>
                     <Ionicons name="pulse-outline" size={16} color={colors.textMuted} />
@@ -282,7 +346,6 @@ export default function TargetsScreen() {
                   />
                 </View>
 
-                {/* Goal */}
                 <View style={styles.fieldBlock}>
                   <View style={styles.fieldHeaderRow}>
                     <Ionicons name="flag-outline" size={16} color={colors.brandPrimary} />
@@ -302,7 +365,6 @@ export default function TargetsScreen() {
                   />
                 </View>
 
-                {/* Context tip */}
                 {editTarget?.category === 'strength' && (
                   <View style={styles.tipBox}>
                     <Ionicons name="information-circle-outline" size={16} color={colors.brandPrimary} />
@@ -345,7 +407,6 @@ function TargetCard({
       activeOpacity={0.75}
     >
       <View style={styles.targetCardInner}>
-        {/* Icon */}
         <View style={[styles.targetIconWrap, done && styles.targetIconWrapDone]}>
           <Ionicons
             name={target.icon as any}
@@ -354,7 +415,6 @@ function TargetCard({
           />
         </View>
 
-        {/* Info */}
         <View style={styles.targetInfo}>
           <Text style={styles.targetName}>{target.name}</Text>
           {hasGoal ? (
@@ -370,7 +430,6 @@ function TargetCard({
           )}
         </View>
 
-        {/* Right */}
         <View style={styles.targetRight}>
           {hasGoal && (
             <Text style={[styles.targetPct, done && styles.targetPctDone]}>
@@ -381,7 +440,6 @@ function TargetCard({
         </View>
       </View>
 
-      {/* Progress bar */}
       {hasGoal && (
         <View style={styles.progressTrack}>
           <View
@@ -403,80 +461,96 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1, paddingHorizontal: 20 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 20,
+  scroll: { paddingBottom: 60, paddingTop: 16 },
+
+  // New Header
+  mainHeader: {
+    marginBottom: 24,
   },
-  headerTitle: {
+  mainTitle: {
     fontSize: 28,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    fontStyle: 'italic',
+  },
+  dateRange: {
+    fontSize: 16,
+    color: colors.textMuted,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+
+  // Viz Section
+  vizSection: {
+    paddingVertical: 10,
+    marginBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Muscle Section
+  muscleSection: {
+    marginBottom: 32,
+  },
+
+  // History Section
+  historySection: {
+    marginBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 22,
     fontWeight: '900',
     fontStyle: 'italic',
     color: colors.textPrimary,
+    marginBottom: 16,
   },
-  resetAllBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
+  historyScroll: {
+    gap: 20,
+    paddingRight: 20,
+  },
+  historyItem: {
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 8,
   },
-
-  scroll: { paddingBottom: 40 },
-
-  // Summary card
-  summaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  summaryLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+  historyDate: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textMuted,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: colors.textPrimary,
-    marginBottom: 10,
-  },
-  summaryTrack: {
-    height: 4,
-    backgroundColor: colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  summaryFill: {
-    height: 4,
-    backgroundColor: colors.brandPrimary,
-    borderRadius: 2,
   },
 
-  // Sections
-  section: { marginBottom: 28 },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: 24,
+  },
+
+  manageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  manageTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+
+  // Old Sections
+  section: { marginBottom: 24 },
   sectionHeader: { marginBottom: 12 },
-  sectionTitle: {
+  sectionTitleSmall: {
     fontSize: 18,
     fontWeight: '800',
     fontStyle: 'italic',
     color: colors.textPrimary,
   },
-  sectionSub: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
 
   // Target card
   targetCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -494,7 +568,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,194,255,0.10)',
+    backgroundColor: 'rgba(0,194,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -521,48 +595,22 @@ const styles = StyleSheet.create({
   },
   progressFillDone: { backgroundColor: colors.success },
 
-  hintText: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-
-  // Empty state
-  emptyState: {
-    flex: 1,
+  emptyCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    paddingBottom: 80,
+    gap: 12,
+    padding: 16,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 16,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  iconBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(0,194,255,0.08)',
-    borderWidth: 2,
-    borderColor: 'rgba(0,194,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+  emptyCardText: {
+    fontSize: 14,
+    color: colors.brandPrimary,
+    fontWeight: '600',
   },
-  emptyTitle: { fontSize: 24, fontWeight: '800', color: colors.textPrimary },
-  emptySubtitle: {
-    fontSize: 15,
-    color: colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: 280,
-  },
-  initBtn: {
-    backgroundColor: colors.brandPrimary,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 30,
-    marginTop: 8,
-  },
-  initBtnText: { fontSize: 16, fontWeight: '700', color: colors.background },
 
   // Modal
   modalContainer: { flex: 1 },

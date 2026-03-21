@@ -27,23 +27,29 @@ import { createApiClient } from '@apex/shared';
 function getApiBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
+  // 1. Check if we are running in a simulator/emulator
+  // In Expo, Constants.isDevice is often available via expo-device.
+  // But we can also check for 'localhost' needs by sniffing the environment.
+  const isSimulator = (Constants as any)?.appOwnership !== 'expo' && 
+                     !(Constants as any)?.isDevice;
+
+  if (isSimulator && !envUrl?.includes('10.0.2.2')) {
+    // Android emulators need 10.0.2.2, iOS usually localhost.
+    // If we are on a simulator and the env says LAN IP, it might be safer to try localhost.
+    console.log('[API FORENSIC] Simulator detected, preferring localhost');
+    return 'http://localhost:4001';
+  }
+
   if (envUrl) {
-    console.log('[API FORENSIC] Found EXPO_PUBLIC_API_URL in process.env:', envUrl);
+    console.log('[API FORENSIC] Using EXPO_PUBLIC_API_URL:', envUrl);
     return envUrl;
   }
 
-  // Common locations for the debugger host in different Expo versions
+  // 2. Try to detect LAN IP from Expo Constants (Debugger Host)
   const expoGoDebuggerHost = (Constants as any)?.expoGoConfig?.debuggerHost;
   const expoConfigHostUri = (Constants as any)?.expoConfig?.hostUri;
   const manifest2HostUri = (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
   const legacyManifestDebuggerHost = (Constants as any)?.manifest?.debuggerHost;
-
-  console.log('[API FORENSIC] Constants probe:', {
-    expoGoConfig: (Constants as any)?.expoGoConfig,
-    expoConfig: (Constants as any)?.expoConfig,
-    manifest2: (Constants as any)?.manifest2,
-    manifest: (Constants as any)?.manifest,
-  });
 
   const debuggerHost =
     expoGoDebuggerHost ?? expoConfigHostUri ?? manifest2HostUri ?? legacyManifestDebuggerHost;

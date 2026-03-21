@@ -75,6 +75,7 @@ export type BodyStackParamList = {
   BodyMeasurements: undefined;
   BodyPhotos: undefined;
   BodyStatistics: undefined;
+  MuscleDetail: { muscleId: string; name: string; analytic?: any };
 };
 
 export type TargetsStackParamList = {

@@ -31,13 +31,18 @@ app.use('/api', apiLimiter);
 // ─── Request logging (dev) ────────────────────────────────────────────────────
 
 if (config.nodeEnv !== 'production') {
+  const fs = require('fs');
   app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     const start = Date.now();
     
     res.on('finish', () => {
       const duration = Date.now() - start;
-      console.log(`[${timestamp}] 📡 ${req.method} ${req.path} — ${res.statusCode} (${duration}ms)`);
+      const logLine = `[${timestamp}] 📡 ${req.method} ${req.path} — ${res.statusCode} (${duration}ms)\n`;
+      console.log(logLine.trim());
+      try {
+        fs.appendFileSync('/tmp/backend_requests.log', logLine);
+      } catch (e) {}
     });
     
     next();
@@ -78,6 +83,21 @@ app.use((_req, res) => {
 });
 
 // ─── Global error handler ─────────────────────────────────────────────────────
+
+process.on('uncaughtException', (err) => {
+  const fs = require('fs');
+  const log = `[${new Date().toISOString()}] 🚨 UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}\n`;
+  console.error(log);
+  try { fs.appendFileSync('/tmp/backend_errors.log', log); } catch (e) {}
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  const fs = require('fs');
+  const log = `[${new Date().toISOString()}] 🚨 UNHANDLED REJECTION: ${reason}\n`;
+  console.error(log);
+  try { fs.appendFileSync('/tmp/backend_errors.log', log); } catch (e) {}
+});
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
