@@ -199,18 +199,18 @@ Example endpoints:
 
 ```
 GET  /api/programs
-GET  /api/workouts
+GET  /api/workouts/today
 POST /api/training-log
-POST /api/body-metrics
+POST /api/metrics
 ```
 
 Authentication endpoints:
 
 ```
-POST /auth/register
-POST /auth/login
-POST /auth/refresh
-POST /auth/logout
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/refresh
+POST /api/auth/logout
 ```
 
 All responses follow this structure:
@@ -312,7 +312,7 @@ Apex Protocol is designed for:
 |---------|------|-----|
 | Backend API | 4001 | `http://localhost:4001` |
 
-**Mobile (Expo):** use your machine's LAN IP for real devices — do NOT use `localhost`.
+**Mobile (Expo):** use your machine's LAN IP (and port 8081/8082) for real devices — do NOT use `localhost` in the API URL.
 
 ---
 

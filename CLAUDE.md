@@ -67,6 +67,13 @@ npm run db:reset          # wipe and re-migrate (destructive)
 npm run db:studio         # open Prisma Studio UI
 ```
 
+### Exercise Data (run from `backend/`)
+
+```bash
+npm run exercises:import      # import exercises from external source
+npm run exercises:fix-media   # fix exercise media URLs
+```
+
 ### Environment Setup
 
 Backend: copy `backend/.env.example` → `backend/.env`
@@ -80,10 +87,10 @@ PORT=4001
 Mobile: copy `apps/mobile/.env.example` → `apps/mobile/.env`
 
 ```
-EXPO_PUBLIC_API_URL=http://localhost:4001   # use LAN IP for real devices
+EXPO_PUBLIC_API_URL=http://<YOUR_LAN_IP>:4001   # e.g., http://10.0.0.170:4001
 ```
 
-> **Physical device note:** Leave `EXPO_PUBLIC_API_URL` unset and Expo will auto-detect your LAN IP via `Constants.expoGoConfig.debuggerHost`. Only set it explicitly when auto-detection fails.
+> **Physical device note:** Leave `EXPO_PUBLIC_API_URL` unset and Expo will attempt to auto-detect your LAN IP via `Constants.expoGoConfig.debuggerHost`. If auto-detection fails (common on some networks), set it explicitly to your machine's LAN IP.
 
 ---
 
@@ -209,6 +216,10 @@ Use centralized design tokens. Current brand values:
 - Bold italics for hero/emphasis text
 - No random inline styles — always reference design tokens
 
+### Path Alias
+
+Mobile uses `@/*` → `src/*` (configured in `apps/mobile/tsconfig.json`). Use this for all internal imports within the mobile app (e.g., `import { colors } from '@/theme'`).
+
 ### Component Rules
 
 - reusable components only
@@ -232,6 +243,8 @@ Use: **React Navigation**
 
 - `MainNavigator.tsx` — root navigator, handles Auth/Onboarding/Main switching
 - `BodyNavigator.tsx` — nested stack inside the Body tab
+- `WorkoutNavigator.tsx` — nested stack inside the Workout tab
+- `SessionNavigator.tsx` — workout session flow navigator
 
 ### Current Navigation Structure
 
@@ -243,11 +256,20 @@ Root (MainNavigator)
 │   └── Onboarding (15 steps)
 └── Main Tab Navigator (authenticated + onboarded)
     ├── Dashboard (icon: home)
-    ├── Workout   (icon: barbell)
+    ├── Workout   (icon: barbell) → WorkoutNavigator (nested stack)
+    │   ├── WorkoutScreen
+    │   ├── PlanDetailsScreen
+    │   ├── ExerciseSelectionScreen
+    │   └── SessionNavigator → session flow
     ├── Progress  (icon: trending-up)
     ├── Body      (icon: body) → BodyNavigator (nested stack)
     │   ├── BodyScreen
-    │   └── TargetsScreen
+    │   ├── TargetsScreen
+    │   ├── BodyWeightDetailScreen
+    │   ├── BodyFatDetailScreen
+    │   ├── BodyMeasurementsScreen
+    │   ├── BodyPhotosScreen
+    │   └── BodyStatisticsScreen
     └── Log       (icon: calendar)
 ```
 
@@ -295,6 +317,8 @@ Key methods: `login()`, `register()`, `logout()`, `loginDev()` (dev only).
 - 401/403 responses trigger a global unauthorized handler that clears tokens and alerts the user
 - Always use `AuthContext` — never manage tokens manually in screens
 
+Onboarding state is managed separately in `apps/mobile/src/context/OnboardingContext.tsx` — use this for onboarding step data, never duplicate onboarding state into AuthContext.
+
 ---
 
 ## 10. Backend Development Rules
@@ -302,15 +326,14 @@ Key methods: `login()`, `register()`, `logout()`, `loginDev()` (dev only).
 Backend is the **single source of truth**.
 
 ```
-backend/
-├── controllers/    → handle requests
+backend/src/
+├── routes/         → request routing (one file per domain)
 ├── services/       → business logic
-├── repositories/   → DB access
-├── models/
-├── routes/
-├── middleware/
-├── utils/
-└── config/
+├── repositories/   → DB access (Prisma queries)
+├── middleware/     → auth, rate limiting, validation
+├── config/         → configuration setup
+├── db/             → Prisma client setup
+└── scripts/        → one-off data import/fix scripts
 ```
 
 ---
@@ -323,15 +346,15 @@ RESTful APIs only.
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/auth/register` | Create account |
-| POST | `/auth/login` | Login |
-| POST | `/auth/refresh` | Refresh JWT |
-| POST | `/auth/logout` | Logout |
-| GET | `/auth/me` | Get current user |
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Login |
+| POST | `/api/auth/refresh` | Refresh JWT |
+| POST | `/api/auth/logout` | Logout |
+| GET | `/api/auth/me` | Get current user |
 | GET | `/api/programs` | List programs |
 | GET | `/api/programs/assigned` | Get assigned program |
 | POST | `/api/programs/generate` | Generate program from profile |
-| POST | `/api/programs/assign` | Assign a program to user |
+| POST | `/api/programs/:id/assign` | Assign a program to user |
 | GET | `/api/workouts/today` | Get today's workout |
 | GET | `/api/profiles/onboarding` | Get onboarding profile |
 | POST | `/api/profiles/onboarding` | Save onboarding profile |
@@ -346,6 +369,9 @@ RESTful APIs only.
 | POST | `/api/training-log` | Log an exercise session |
 | GET | `/api/training-log/history` | Paginated training history |
 | GET | `/api/training-log/exercise/:exerciseId` | Exercise progression history |
+| GET | `/api/exercises` | Exercise library |
+| GET | `/api/workouts/session` | Active workout session |
+| POST | `/api/workouts/session` | Start/update workout session |
 
 ### Response Format
 

@@ -78,7 +78,7 @@ function groupAlphabetically(exercises: ExerciseItem[]) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export default function ExercisePicker({ visible, onClose, onSelect, title = 'Categories' }: ExercisePickerProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('categories');
+  const [activeTab, setActiveTab] = useState<TabId>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
@@ -107,9 +107,18 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
       } else {
         endpoint = `/api/exercises`;
       }
+      console.log('[ExercisePicker] fetching:', endpoint);
       const res = await api.request<{ exercises: ExerciseItem[] }>('GET', endpoint);
-      if (res.success) setExercises(res.data?.exercises || []);
-    } catch { /* ignore */ } finally {
+      const list = res.data?.exercises || [];
+      console.log('[ExercisePicker] result: success=', res.success, 'count=', list.length, 'error=', res.error);
+      if (list.length > 0) {
+        const sample = list[0];
+        console.log('[ExercisePicker] sample exercise:', sample.name, '| mediaUrl:', sample.mediaUrl);
+      }
+      if (res.success) setExercises(list);
+    } catch (err) {
+      console.error('[ExercisePicker] fetch failed:', err);
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -131,7 +140,7 @@ export default function ExercisePicker({ visible, onClose, onSelect, title = 'Ca
     setSelectedCategoryId(null);
     setSelectedMuscle(null);
     setSelectedExercises(new Set());
-    setActiveTab('categories');
+    setActiveTab('all');
     setExercises([]);
   };
 

@@ -28,7 +28,7 @@ function getApiBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
   if (envUrl) {
-    console.log('[API] Using EXPO_PUBLIC_API_URL from environment:', envUrl);
+    console.log('[API FORENSIC] Found EXPO_PUBLIC_API_URL in process.env:', envUrl);
     return envUrl;
   }
 
@@ -38,30 +38,30 @@ function getApiBaseUrl(): string {
   const manifest2HostUri = (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
   const legacyManifestDebuggerHost = (Constants as any)?.manifest?.debuggerHost;
 
-  console.log('[API] Detection — Constants.expoGoConfig?.debuggerHost:', expoGoDebuggerHost);
-  console.log('[API] Detection — Constants.expoConfig?.hostUri:', expoConfigHostUri);
-  console.log('[API] Detection — Constants.manifest2?.extra?.expoClient?.hostUri:', manifest2HostUri);
-  console.log('[API] Detection — Constants.manifest?.debuggerHost:', legacyManifestDebuggerHost);
+  console.log('[API FORENSIC] Constants probe:', {
+    expoGoConfig: (Constants as any)?.expoGoConfig,
+    expoConfig: (Constants as any)?.expoConfig,
+    manifest2: (Constants as any)?.manifest2,
+    manifest: (Constants as any)?.manifest,
+  });
 
   const debuggerHost =
     expoGoDebuggerHost ?? expoConfigHostUri ?? manifest2HostUri ?? legacyManifestDebuggerHost;
 
   if (debuggerHost) {
-    // hostUri usually includes the port (e.g. 192.168.1.50:8081), we only want the IP
     const host = debuggerHost.split(':')[0];
     const resolvedUrl = `http://${host}:4001`;
-    console.info('[API] Success — Resolved API_BASE_URL from Expo host:', resolvedUrl);
+    console.log('[API FORENSIC] Success — Resolved host IP from Expo:', host);
     return resolvedUrl;
   }
 
   const fallbackUrl = 'http://localhost:4001';
-  console.warn('[API] Warning — Could not resolve host IP. Falling back to localhost:', fallbackUrl);
-  console.warn('[API] Note — If testing on a real device, you must set EXPO_PUBLIC_API_URL in apps/mobile/.env');
+  console.log('[API FORENSIC] Fallback to localhost');
   return fallbackUrl;
 }
 
-const API_BASE_URL = getApiBaseUrl();
-console.log('[API] Final API_BASE_URL =', API_BASE_URL);
+export const API_BASE_URL = getApiBaseUrl();
+console.log('[API FORENSIC] FINAL API_BASE_URL:', API_BASE_URL);
 
 const TOKEN_KEY = 'apex_token';
 const REFRESH_TOKEN_KEY = 'apex_refresh_token';

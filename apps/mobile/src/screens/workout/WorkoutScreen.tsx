@@ -25,6 +25,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '../../services/api';
 import ExercisePicker from '../../components/ExercisePicker';
+import SwapWorkoutSheet from '../../components/SwapWorkoutSheet';
 import type { TodayWorkout, SessionExercise, ActiveSession } from '../../types/workout';
 import type { SessionStackParamList } from '../../navigation/types';
 
@@ -96,6 +97,8 @@ function mapToExercises(workout: TodayWorkout): WorkoutExercise[] {
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((p) => {
       const { repMin, repMax } = parseRepRange(p.targetRepRange);
+      const mediaUrl = p.exercise.mediaUrl || null;
+      console.log(`[WorkoutScreen] exercise "${p.exercise.name}" mediaUrl:`, mediaUrl);
       return {
         id: p.exercise.id,
         prescriptionId: p.id,
@@ -107,7 +110,7 @@ function mapToExercises(workout: TodayWorkout): WorkoutExercise[] {
         rirTarget: 2,
         suggestedWeight: p.suggestedWeight || 0,
         weightUnit: p.weightUnit || 'kg',
-        mediaUrl: p.exercise.mediaUrl || null,
+        mediaUrl,
       };
     });
 }
@@ -220,62 +223,29 @@ function ExerciseOptionsSheet({
           ))}
 
           <View style={sheetStyles.divider} />
-
-          {/* Toggle items */}
-          <View style={sheetStyles.menuRow}>
-            <Ionicons name="thumbs-up-outline" size={22} color={colors.textPrimary} />
-            <Text style={sheetStyles.menuLabel}>Recommend more often</Text>
-            <Switch
-              value={false}
-              onValueChange={() => {}}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(0,194,255,0.3)' }}
-              thumbColor="#555"
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-          </View>
-          <View style={sheetStyles.menuRow}>
-            <Ionicons name="thumbs-down-outline" size={22} color={colors.textPrimary} />
-            <Text style={sheetStyles.menuLabel}>Recommend less often</Text>
-            <Switch
-              value={false}
-              onValueChange={() => {}}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(0,194,255,0.3)' }}
-              thumbColor="#555"
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-          </View>
-
-          <View style={sheetStyles.divider} />
-
-          <TouchableOpacity style={sheetStyles.menuRow} onPress={() => {}}>
-            <Ionicons name="ban-outline" size={22} color={colors.textPrimary} />
-            <Text style={sheetStyles.menuLabel}>Don't recommend again</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          
+          <TouchableOpacity 
+            style={[sheetStyles.menuRow, { paddingVertical: 16 }]} 
+            onPress={() => { onClose(); onDelete(); }}
+          >
+            <Ionicons name="trash-outline" size={22} color="#FF453A" />
+            <Text style={[sheetStyles.menuLabel, { color: '#FF453A' }]}>Delete Exercise</Text>
           </TouchableOpacity>
-
-          <View style={sheetStyles.divider} />
-
-          <TouchableOpacity style={sheetStyles.menuRow} onPress={() => { onClose(); onDelete(); }}>
-            <Ionicons name="trash-outline" size={22} color={colors.danger} />
-            <Text style={[sheetStyles.menuLabel, { color: colors.danger }]}>Delete from workout</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          <View style={{ height: 30 }} />
         </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
 }
 
+
 const sheetStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#111118',
+    backgroundColor: '#1C1C26',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -296,11 +266,11 @@ const sheetStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
-    paddingBottom: 12,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: 12 },
+  title: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, flex: 1 },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1125,6 +1095,31 @@ const finishStyles = StyleSheet.create({
   logBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
 
+// ─── ExerciseImage ────────────────────────────────────────────────────────────
+// Wrapper around Image that falls back to the barbell placeholder on load error.
+
+function ExerciseImage({ uri, style }: { uri: string; style: any }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <View style={[style, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Ionicons name="barbell-outline" size={48} color="rgba(255,255,255,0.15)" />
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      resizeMode="cover"
+      onError={() => {
+        console.warn('[WorkoutScreen] Image failed to load:', uri);
+        setFailed(true);
+      }}
+    />
+  );
+}
+
 // ─── WorkoutState type ────────────────────────────────────────────────────────
 
 type WorkoutState = 'loading' | 'idle' | 'active' | 'saving' | 'completed' | 'streak' | 'error' | 'rest' | 'no-program';
@@ -1169,6 +1164,11 @@ export default function WorkoutScreen() {
 
   // Tooltip
   const [showTooltip, setShowTooltip] = useState(false);
+
+  // Swap workout sheet
+  const [showSwapSheet, setShowSwapSheet] = useState(false);
+  const [currentWeekDays, setCurrentWeekDays] = useState<any[]>([]);
+  const [loadingWeek, setLoadingWeek] = useState(false);
 
   // Sync
   const [syncPrefs, setSyncPrefs] = useState({ appleHealth: false, strava: false, fitbit: false });
@@ -1249,6 +1249,9 @@ export default function WorkoutScreen() {
       const mapped = mapToExercises(data);
       setExercises(mapped);
 
+      // Fetch all days in the current week for the swap sheet
+      fetchWeekDays(data.program.id, data.currentWeek.absoluteWeekNumber);
+
       const saved = await loadSession();
       if (saved && saved.workoutDayId === data.workoutDay.id) {
         Alert.alert('Resume Session?', 'Continue from where you left off?', [
@@ -1276,6 +1279,23 @@ export default function WorkoutScreen() {
   }, []);
 
   useEffect(() => { loadWorkout(); }, [loadWorkout]);
+
+  const fetchWeekDays = async (programId: string, absoluteWeek: number) => {
+    setLoadingWeek(true);
+    try {
+      const res = await api.programs.getWeeks(programId);
+      if (res.success && res.data?.weeks) {
+        const week = (res.data.weeks as any[]).find(w => w.absoluteWeekNumber === absoluteWeek);
+        if (week?.workoutDays) {
+          setCurrentWeekDays(week.workoutDays);
+        }
+      }
+    } catch (err) {
+      console.error('[WorkoutScreen] Failed to fetch week days:', err);
+    } finally {
+      setLoadingWeek(false);
+    }
+  };
 
   async function startWorkout() {
     if (!workout?.workoutDay) return;
@@ -1528,9 +1548,9 @@ export default function WorkoutScreen() {
             {/* Workout title row */}
             <View style={ms.workoutTitleRow}>
               <Text style={ms.workoutTitle}><Text style={{ fontStyle: 'italic', fontWeight: '900' }}>{workoutName}</Text></Text>
-              <TouchableOpacity style={ms.swapPill}>
-                <Ionicons name="swap-horizontal" size={14} color={colors.textMuted} />
-                <Text style={ms.swapText}> Swap</Text>
+              <TouchableOpacity style={ms.swapPill} onPress={() => setShowSwapSheet(true)}>
+                <Ionicons name="swap-horizontal" size={14} color={colors.brandPrimary} />
+                <Text style={[ms.swapText, { color: colors.brandPrimary }]}> Swap</Text>
               </TouchableOpacity>
               <TouchableOpacity style={ms.dotBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
@@ -1566,7 +1586,7 @@ export default function WorkoutScreen() {
                     {/* Full square thumbnail with muscle overlay */}
                     <View style={ms.exThumb}>
                       {ex.mediaUrl ? (
-                        <Image source={{ uri: ex.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                        <ExerciseImage uri={ex.mediaUrl} style={StyleSheet.absoluteFill} />
                       ) : (
                         <Ionicons name="barbell-outline" size={24} color={colors.textMuted} />
                       )}
@@ -1606,7 +1626,7 @@ export default function WorkoutScreen() {
               ))}
 
               {/* Add Exercise */}
-              <TouchableOpacity style={ms.addExerciseRow} onPress={() => navigation.navigate('ExerciseSelection')}>
+              <TouchableOpacity style={ms.addExerciseRow} onPress={() => { console.log('[WorkoutScreen] Add Exercise pressed'); setShowExercisePicker(true); }}>
                 <View style={ms.addExerciseIcon}>
                   <Ionicons name="add" size={20} color={colors.brandPrimary} />
                 </View>
@@ -1636,6 +1656,20 @@ export default function WorkoutScreen() {
             }
           }}
           onReplace={() => setShowExercisePicker(true)}
+        />
+
+        <SwapWorkoutSheet
+          visible={showSwapSheet}
+          onClose={() => setShowSwapSheet(false)}
+          currentWorkoutDayId={workout?.workoutDay?.id}
+          splitDays={currentWeekDays}
+          onSelectDay={(day) => {
+            console.log('[WorkoutScreen] Swapping to day:', day.id);
+            setWorkout(prev => prev ? { ...prev, workoutDay: day } : null);
+            setExercises(mapToExercises({ ...workout!, workoutDay: day }));
+          }}
+          onPickMuscles={() => navigation.navigate('ExerciseSelection')}
+          onCreateCustom={() => navigation.navigate('ExerciseSelection')}
         />
 
         <ExercisePicker
@@ -1668,7 +1702,7 @@ export default function WorkoutScreen() {
         {/* ── Exercise image/header area ─────────────── */}
         <View style={ms.exDetailHeader}>
           {currentEx?.mediaUrl ? (
-            <Image source={{ uri: currentEx.mediaUrl }} style={ms.exImage} resizeMode="cover" />
+            <ExerciseImage uri={currentEx.mediaUrl} style={ms.exImage} />
           ) : (
             <View style={ms.exImagePlaceholder}>
               <Ionicons name="barbell-outline" size={48} color="rgba(255,255,255,0.15)" />

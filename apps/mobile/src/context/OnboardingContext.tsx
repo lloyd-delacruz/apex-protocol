@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../lib/api';
+import api, { API_BASE_URL } from '../lib/api';
 import { useAuth } from './AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,6 +140,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [state]);
 
   const generateProgram = useCallback(async () => {
+    const method = 'POST';
+    const path = '/api/programs/generate';
+    const fullUrl = `${API_BASE_URL}${path}`;
+
     try {
       // 1. Map mobile-specific goal to backend GoalType array (aligned with DB tags)
       const goalMapping: Record<string, string[]> = {
@@ -164,20 +168,58 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       });
 
       // 3. Align field names with backend schema (src/routes/programs.ts -> generateSchema)
-      const res = await api.request<{ program: { id: string } }>('POST', '/api/programs/generate', {
+      const payload = {
         goals,
         experienceLevel: state.experience,
         daysPerWeek: state.workoutsPerWeek,
         equipment,
+      };
+      
+      const { loadToken } = await import('../lib/api');
+      const token = await loadToken();
+
+      console.log('--- [FORENSIC DEBUG] generateProgram START ---');
+      console.log('1. final API_BASE_URL:', API_BASE_URL);
+      console.log('2. full request URL:', fullUrl);
+      console.log('3. HTTP method:', method);
+      console.log('4. request payload:', JSON.stringify(payload, null, 2));
+      console.log('5. whether auth token exists:', !!token);
+
+      const res = await api.request<{ program: { id: string } }>(method, path, payload);
+      
+      console.log('6. API Response:', {
+        success: res.success,
+        error: (res as any).error,
+        data: res.data
       });
 
-      if (res.success && res.data) {
-        const programId = res.data.program.id;
-        await api.request('POST', `/api/programs/${programId}/assign`);
-        return programId;
+      if (!res.success) {
+        const errMsg = (res as any).error || 'Failed to generate program';
+        const isNetworkErr = errMsg.includes('Cannot reach the server') || errMsg.includes('Network request failed');
+        if (isNetworkErr) {
+          throw new Error(`Cannot reach the server at ${API_BASE_URL}. Ensure the backend is running on port 4001 and accessible from this device.`);
+        }
+        throw new Error(errMsg);
       }
-      throw new Error(res.error || 'Failed to generate program');
-    } catch (err) {
+
+      console.log('--- [FORENSIC DEBUG] generateProgram SUCCESS ---');
+
+      const programId = res.data!.program.id;
+      console.log('[OnboardingContext] assigning programId:', programId);
+      const assignRes = await api.request('POST', `/api/programs/${programId}/assign`);
+      console.log('[OnboardingContext] assign response: success=', assignRes.success, 'error=', (assignRes as any).error);
+      if (!assignRes.success) {
+        throw new Error((assignRes as any).error || 'Failed to assign program');
+      }
+      return programId;
+    } catch (err: any) {
+      console.log('--- [FORENSIC DEBUG] generateProgram FAILED ---');
+      console.log('6. exact caught error object:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+        ...err
+      });
       console.error('[OnboardingContext] Program generation failed:', err);
       throw err;
     }

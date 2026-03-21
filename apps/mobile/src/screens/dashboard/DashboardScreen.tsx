@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTodayWorkout, useTrainingHistory } from '../../hooks/useWorkout';
 import { useProgress } from '../../hooks/useProgress';
 import { useProfile } from '../../hooks/useProfile';
+import SwapWorkoutSheet from '../../components/SwapWorkoutSheet';
 
 const { width, height } = Dimensions.get('window');
 
@@ -122,6 +123,11 @@ export default function DashboardScreen() {
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
   const [workoutMenuVisible, setWorkoutMenuVisible] = useState(false);
 
+  // Swap workout sheet states
+  const [showSwapSheet, setShowSwapSheet] = useState(false);
+  const [currentWeekDays, setCurrentWeekDays] = useState<any[]>([]);
+  const [loadingWeek, setLoadingWeek] = useState(false);
+
   const dashState = useMemo<DashState>(() => {
     if (loadingWorkout) return 'loading';
     if (workoutError) return 'error';
@@ -135,6 +141,29 @@ export default function DashboardScreen() {
     await Promise.allSettled([refreshWorkout()]);
     setRefreshing(false);
   }, [refreshWorkout]);
+
+  const fetchWeekDays = useCallback(async (programId: string, absoluteWeek: number) => {
+    setLoadingWeek(true);
+    try {
+      const res = await api.programs.getWeeks(programId);
+      if (res.success && res.data?.weeks) {
+        const week = (res.data.weeks as any[]).find(w => w.absoluteWeekNumber === absoluteWeek);
+        if (week?.workoutDays) {
+          setCurrentWeekDays(week.workoutDays);
+        }
+      }
+    } catch (err) {
+      console.error('[DashboardScreen] Failed to fetch week days:', err);
+    } finally {
+      setLoadingWeek(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (todayWorkout?.program && todayWorkout?.currentWeek) {
+      fetchWeekDays(todayWorkout.program.id, todayWorkout.currentWeek.absoluteWeekNumber);
+    }
+  }, [todayWorkout, fetchWeekDays]);
 
   const workoutDay = todayWorkout?.workoutDay;
   const exercises = workoutDay?.exercisePrescriptions ?? [];
@@ -159,7 +188,7 @@ export default function DashboardScreen() {
       </View>
       {!isEmpty && (
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.swapBtn}>
+          <TouchableOpacity style={styles.swapBtn} onPress={() => setShowSwapSheet(true)}>
             <Ionicons name="swap-horizontal" size={16} color="#fff" />
             <Text style={styles.swapBtnText}>Swap</Text>
           </TouchableOpacity>
@@ -379,6 +408,25 @@ export default function DashboardScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <SwapWorkoutSheet
+        visible={showSwapSheet}
+        onClose={() => setShowSwapSheet(false)}
+        currentWorkoutDayId={workoutDay?.id}
+        splitDays={currentWeekDays}
+        onSelectDay={(day) => {
+          // In Dashboard, swapping means changing the todayWorkout day.
+          // Since useTodayWorkout holds its own state, we might need a way to update it.
+          // For now, we'll refresh the workout or use a local override if we want instant feedback.
+          // The most reliable way is to call the swap API if it exists, or just refresh.
+          console.log('[DashboardScreen] Swapping to day:', day.id);
+          // TODO: If there's a background swap API, call it here.
+          // For now, we just log it and potentially the user will see it update on refresh.
+          refreshWorkout();
+        }}
+        onPickMuscles={() => navigation.navigate('Workout' as never)}
+        onCreateCustom={() => navigation.navigate('Workout' as never)}
+      />
     </View>
   );
 }

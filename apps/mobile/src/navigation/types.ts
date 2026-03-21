@@ -24,7 +24,7 @@ export type AuthStackNavProp = NativeStackNavigationProp<AuthStackParamList>;
 // ─── Onboarding Stack ─────────────────────────────────────────────────────────
 
 export type OnboardingStackParamList = {
-  Onboarding: undefined;
+  OnboardingScreen: undefined;
 };
 
 export type OnboardingStackNavProp =

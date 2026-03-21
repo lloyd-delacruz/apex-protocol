@@ -95,7 +95,7 @@ export default function ExerciseSelectionScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.brandPrimary} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Select Exercise</Text>
-          <View style={{ width: 24 }} /> {/* Spacer */}
+          <View style={{ width: 24 }} />{/* Spacer */}
         </View>
 
         {/* Search */}
