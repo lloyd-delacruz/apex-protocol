@@ -12,7 +12,7 @@ interface WeeklySetHexagonProps {
 export const WeeklySetHexagon: React.FC<WeeklySetHexagonProps> = ({
   percentage,
   size = 200,
-  strokeWidth = 10,
+  strokeWidth = 8,
 }) => {
   const center = size / 2;
   const radius = (size - strokeWidth) / 2;
@@ -31,43 +31,57 @@ export const WeeklySetHexagon: React.FC<WeeklySetHexagonProps> = ({
   const hexagonPath = `M ${points[0].x} ${points[0].y} ` +
     points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + ' Z';
 
-  // For the progress, we can use dasharray or segments. 
-  // A simpler way for a hexagon is to draw it and use strokeDasharray.
-  const perimeter = radius * 6; // Rough approximation for hexagon perimeter
-  // Better approximation: side length is radius
-  const sideLength = radius * 1;
-  const totalLength = sideLength * 6;
+  // For the progress, we use strokeDasharray.
+  // Side length of a regular hexagon is the same as its circumradius.
+  const totalLength = radius * 6;
   const strokeDashoffset = totalLength - (totalLength * (percentage / 100));
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size}>
         <Defs>
-          <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={colors.brandPrimary} stopOpacity="1" />
-            <Stop offset="1" stopColor={colors.accentSecondary} stopOpacity="1" />
+          <LinearGradient id="hexagonGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#4ADE80" stopOpacity="1" />
+            <Stop offset="0.2" stopColor="#FACC15" stopOpacity="1" />
+            <Stop offset="0.5" stopColor="#F87171" stopOpacity="1" />
+            <Stop offset="0.8" stopColor="#818CF8" stopOpacity="1" />
+            <Stop offset="1" stopColor="#22D3EE" stopOpacity="1" />
           </LinearGradient>
         </Defs>
         <G>
-          {/* Background Hexagon */}
+          {/* Background Hexagon (Static border) */}
           <Path
             d={hexagonPath}
             fill="none"
-            stroke={colors.border}
+            stroke={colors.surfaceElevated}
             strokeWidth={strokeWidth}
             strokeLinejoin="round"
+            opacity={0.3}
           />
-          {/* Progress Hexagon */}
+          
+          {/* Subtle multi-colored track */}
           <Path
             d={hexagonPath}
             fill="none"
-            stroke="url(#grad)"
+            stroke="url(#hexagonGrad)"
             strokeWidth={strokeWidth}
             strokeLinejoin="round"
-            strokeDasharray={totalLength}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
+            opacity={0.5}
           />
+
+          {/* Progress Overlay (Active part) */}
+          {percentage > 0 && (
+            <Path
+              d={hexagonPath}
+              fill="none"
+              stroke="url(#hexagonGrad)"
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+              strokeDasharray={totalLength}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+            />
+          )}
         </G>
       </Svg>
       <View style={styles.content}>
@@ -89,9 +103,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   percentage: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: '900',
     color: colors.textPrimary,
     fontStyle: 'italic',
+    letterSpacing: -2,
   },
 });

@@ -18,8 +18,7 @@ import { colors } from '../theme/colors';
 import { MainTabParamList } from './types';
 
 import WorkoutNavigator from './WorkoutNavigator';
-import SessionNavigator from './SessionNavigator';
-import ProgressScreen from '../screens/progress/ProgressScreen';
+import TargetsScreen from '../screens/targets/TargetsScreen';
 import BodyNavigator from './BodyNavigator';
 import LogScreen from '../screens/workout/LogScreen';
 
@@ -61,21 +60,31 @@ export default function MainNavigator() {
           marginTop: 2,
         },
         tabBarIcon: ({ color, size, focused }) => {
-          const icons = TAB_ICONS[route.name];
+          const icons = TAB_ICONS[route.name as keyof MainTabParamList];
           const name = focused ? icons.active : icons.inactive;
           return <Ionicons name={name} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={WorkoutNavigator} options={{ tabBarLabel: 'Workout' }} />
-      <Tab.Screen name="Workout"   component={SessionNavigator} options={{ tabBarLabel: 'Session' }} />
-      <Tab.Screen name="Progress"  component={ProgressScreen} options={{ tabBarLabel: 'Targets' }} />
+      <Tab.Screen 
+        name="Dashboard" 
+        component={WorkoutNavigator} 
+        options={{ tabBarLabel: 'Workout' }} 
+      />
       <Tab.Screen
         name="Body"
         component={BodyNavigator}
         options={{ tabBarLabel: 'Body' }}
       />
-      <Tab.Screen name="Log"       component={LogScreen} />
+      <Tab.Screen 
+        name="Progress"  
+        component={TargetsScreen} 
+        options={{ tabBarLabel: 'Targets' }} 
+      />
+      <Tab.Screen 
+        name="Log" 
+        component={LogScreen} 
+      />
     </Tab.Navigator>
   );
 }

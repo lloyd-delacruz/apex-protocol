@@ -14,7 +14,7 @@ export const IntroCard: React.FC<IntroCardProps> = ({ onClose, onLearnMore }) =>
       <View style={styles.header}>
         <Text style={styles.title}>Introducing: Set Targets</Text>
         <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color={colors.textMuted} />
+          <Ionicons name="close" size={22} color={colors.danger} />
         </TouchableOpacity>
       </View>
       
@@ -23,7 +23,7 @@ export const IntroCard: React.FC<IntroCardProps> = ({ onClose, onLearnMore }) =>
       </Text>
       
       <Text style={styles.subtext}>
-        Apex now generates weekly volume targets for you based on your goal, workout count and training time.
+        Apex Protocol now generates weekly volume targets for you based on your goal, workout count and training time.
       </Text>
       
       <TouchableOpacity onPress={onLearnMore} style={styles.learnMore}>
@@ -35,45 +35,48 @@ export const IntroCard: React.FC<IntroCardProps> = ({ onClose, onLearnMore }) =>
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 32,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '900',
     color: colors.textPrimary,
+    fontStyle: 'italic',
   },
   closeBtn: {
     padding: 4,
   },
   description: {
-    fontSize: 15,
+    fontSize: 16,
     color: colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: 12,
+    lineHeight: 24,
+    marginBottom: 16,
+    fontWeight: '600',
   },
   subtext: {
-    fontSize: 14,
+    fontSize: 15,
     color: colors.textMuted,
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 22,
+    marginBottom: 24,
   },
   learnMore: {
     alignSelf: 'flex-start',
   },
   learnMoreText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: colors.brandPrimary,
+    textDecorationLine: 'underline',
   },
 });

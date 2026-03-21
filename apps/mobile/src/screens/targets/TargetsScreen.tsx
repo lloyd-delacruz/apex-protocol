@@ -169,8 +169,6 @@ export default function TargetsScreen() {
     return `${fmt(start)} – ${fmt(end)}`;
   }, []);
 
-  const strengthTargets = targets.filter(t => t.category === 'strength');
-  const bodyTargets = targets.filter(t => t.category === 'body');
 
   return (
     <View style={styles.container}>
@@ -197,7 +195,7 @@ export default function TargetsScreen() {
 
           {/* ── Main Visualization ── */}
           <View style={styles.vizSection}>
-            <WeeklySetHexagon percentage={0} size={220} />
+            <WeeklySetHexagon percentage={0} size={240} />
           </View>
 
           {/* ── Muscle Group Cards ── */}
@@ -226,59 +224,6 @@ export default function TargetsScreen() {
                 </View>
               ))}
             </ScrollView>
-          </View>
-
-          {/* ── Old Targets (preserved as secondary) ── */}
-          <View style={styles.divider} />
-          
-          <TouchableOpacity 
-            style={styles.manageHeader}
-            onPress={() => Alert.alert('Manage Goals', 'Personal records and body composition tracking.')}
-          >
-            <Text style={styles.manageTitle}>Personal Benchmarks</Text>
-            <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* ── Strength Targets ── */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitleSmall}>Strength PRS</Text>
-            </View>
-            {strengthTargets.map(t => (
-              <TargetCard
-                key={t.id}
-                target={t}
-                onEdit={() => openEdit(t)}
-                onReset={() => resetTarget(t.id)}
-              />
-            ))}
-            {strengthTargets.length === 0 && (
-              <TouchableOpacity style={styles.emptyCard} onPress={initDefaults}>
-                <Ionicons name="add-circle-outline" size={24} color={colors.brandPrimary} />
-                <Text style={styles.emptyCardText}>Initialize Strength Targets</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* ── Body Targets ── */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitleSmall}>Body Composition</Text>
-            </View>
-            {bodyTargets.map(t => (
-              <TargetCard
-                key={t.id}
-                target={t}
-                onEdit={() => openEdit(t)}
-                onReset={() => resetTarget(t.id)}
-              />
-            ))}
-            {bodyTargets.length === 0 && (
-              <TouchableOpacity style={styles.emptyCard} onPress={initDefaults}>
-                <Ionicons name="add-circle-outline" size={24} color={colors.brandPrimary} />
-                <Text style={styles.emptyCardText}>Initialize Body Targets</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
         </ScrollView>
@@ -382,78 +327,6 @@ export default function TargetsScreen() {
   );
 }
 
-// ─── Target Card ──────────────────────────────────────────────────────────────
-
-function TargetCard({
-  target,
-  onEdit,
-  onReset,
-}: {
-  target: Target;
-  onEdit: () => void;
-  onReset: () => void;
-}) {
-  const hasGoal = target.goal != null;
-  const hasCurrent = target.current != null;
-  const progress = hasGoal && hasCurrent ? Math.min(1, target.current! / target.goal!) : 0;
-  const pct = Math.round(progress * 100);
-  const done = progress >= 1;
-
-  return (
-    <TouchableOpacity
-      style={styles.targetCard}
-      onPress={onEdit}
-      onLongPress={onReset}
-      activeOpacity={0.75}
-    >
-      <View style={styles.targetCardInner}>
-        <View style={[styles.targetIconWrap, done && styles.targetIconWrapDone]}>
-          <Ionicons
-            name={target.icon as any}
-            size={20}
-            color={done ? colors.success : colors.brandPrimary}
-          />
-        </View>
-
-        <View style={styles.targetInfo}>
-          <Text style={styles.targetName}>{target.name}</Text>
-          {hasGoal ? (
-            <Text style={styles.targetMeta}>
-              {hasCurrent ? `${target.current} ${target.unit}` : 'Not set'}
-              {' → '}
-              <Text style={styles.targetGoalText}>
-                {target.goal} {target.unit}
-              </Text>
-            </Text>
-          ) : (
-            <Text style={styles.targetSetHint}>Tap to set goal</Text>
-          )}
-        </View>
-
-        <View style={styles.targetRight}>
-          {hasGoal && (
-            <Text style={[styles.targetPct, done && styles.targetPctDone]}>
-              {done ? '✓' : `${pct}%`}
-            </Text>
-          )}
-          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-        </View>
-      </View>
-
-      {hasGoal && (
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${pct}%` as DimensionValue },
-              done && styles.progressFillDone,
-            ]}
-          />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

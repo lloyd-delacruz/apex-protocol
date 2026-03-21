@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -326,11 +327,22 @@ const pwStyles = StyleSheet.create({
 // ─── Main LogScreen ───────────────────────────────────────────────────────────
 
 export default function LogScreen() {
-  const { user } = useAuth();
+  const { user, resetDevelopment } = useAuth();
   const { sessions, loading, error, refresh } = useTrainingHistory(50);
   const { data: analytics } = useProgress();
   const { profile } = useProfile();
   const [showTooltip, setShowTooltip] = useState(false);
+
+  const handleReset = () => {
+    Alert.alert(
+      'Development Reset',
+      'This will clear ALL local storage, tokens, and onboarding state. You will be logged out. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset App', style: 'destructive', onPress: resetDevelopment }
+      ]
+    );
+  };
 
   useEffect(() => {
     AsyncStorage.getItem(LOG_TOOLTIP_KEY).then(val => {
@@ -412,7 +424,12 @@ export default function LogScreen() {
               <Ionicons name="notifications-outline" size={22} color={colors.textMuted} />
               <View style={ls.notifDot} />
             </TouchableOpacity>
-            <TouchableOpacity style={ls.topBarBtn}>
+            <TouchableOpacity 
+              style={ls.topBarBtn}
+              onPress={() => Alert.alert('Settings', 'Settings coming soon.')}
+              onLongPress={handleReset}
+              delayLongPress={2000}
+            >
               <Ionicons name="settings-outline" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </View>

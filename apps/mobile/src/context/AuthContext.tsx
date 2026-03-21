@@ -17,6 +17,7 @@ interface AuthContextValue {
   setOnboardingComplete: (complete: boolean) => void;
   setSubscriptionActive: (active: boolean) => void;
   loginDev: () => void;
+  resetDevelopment: () => Promise<void>;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -140,6 +141,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[AuthContext] loginDev() — Bypass active with stable mock token.');
   }, []);
 
+  const resetDevelopment = useCallback(async () => {
+    try {
+      // 1. Clear ALL AsyncStorage
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.clear();
+
+      // 2. Clear tokens via API lib (extra safety)
+      const { clearToken, clearRefreshToken } = await import('../lib/api');
+      await clearToken();
+      await clearRefreshToken();
+
+      // 3. Reset internal state
+      setUser(null);
+      setOnboardingCompleteState(false);
+      setSubscriptionActiveState(false);
+
+      console.log('[AuthContext] resetDevelopment() — storage cleared, session nuked. Redirecting to Auth.');
+    } catch (e) {
+      console.error('[AuthContext] resetDevelopment failed:', e);
+      Alert.alert('Reset Failed', 'Could not clear application data.');
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -153,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOnboardingComplete,
         setSubscriptionActive,
         loginDev,
+        resetDevelopment,
       }}
     >
       {children}
