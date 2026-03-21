@@ -1,3 +1,4 @@
+import 'dotenv/config';
 // Centralised config — all env vars resolved once at startup
 
 const config = {

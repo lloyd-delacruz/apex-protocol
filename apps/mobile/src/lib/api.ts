@@ -3,6 +3,11 @@
  *
  * Wraps the shared createApiClient with React Native storage.
  * Uses AsyncStorage for token persistence across app restarts.
+ *
+ * Notes:
+ * - Prefers EXPO_PUBLIC_API_URL when explicitly set
+ * - Supports Expo Go host detection for real devices
+ * - Falls back to localhost only for simulators/emulators
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,28 +16,56 @@ import { createApiClient } from '@apex/shared';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-// Resolve the dev machine's IP from Expo so physical devices can connect.
-// expoConfig.hostUri is like "192.168.1.5:8081" — we strip the Expo port
-// and replace it with the backend's port (4001).
+/**
+ * Resolve the backend base URL.
+ *
+ * Priority:
+ * 1. EXPO_PUBLIC_API_URL from apps/mobile/.env
+ * 2. Expo Go detected host (real device on LAN)
+ * 3. localhost fallback (simulator/emulator only)
+ */
 function getApiBaseUrl(): string {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+
+  if (envUrl) {
+    console.log('[API] Using EXPO_PUBLIC_API_URL from environment:', envUrl);
+    return envUrl;
   }
+
+  const expoGoDebuggerHost = (Constants as any)?.expoGoConfig?.debuggerHost as
+    | string
+    | undefined;
+
+  const manifest2HostUri = (Constants as any)?.manifest2?.extra?.expoClient
+    ?.hostUri as string | undefined;
+
+  const legacyManifestDebuggerHost = (Constants as any)?.manifest?.debuggerHost as
+    | string
+    | undefined;
+
+  console.log('[API] Detection — Constants.expoGoConfig?.debuggerHost:', expoGoDebuggerHost);
+  console.log('[API] Detection — Constants.manifest2?.extra?.expoClient?.hostUri:', manifest2HostUri);
+  console.log('[API] Detection — Constants.manifest?.debuggerHost:', legacyManifestDebuggerHost);
 
   const debuggerHost =
-    Constants.expoConfig?.hostUri ??          // SDK 49+
-    (Constants as any).manifest?.debuggerHost; // older SDKs
+    expoGoDebuggerHost ?? manifest2HostUri ?? legacyManifestDebuggerHost;
 
   if (debuggerHost) {
-    const host = debuggerHost.split(':')[0]; // strip Expo port
-    return `http://${host}:4001`;
+    const host = debuggerHost.split(':')[0];
+    const resolvedUrl = `http://${host}:4001`;
+    console.info('[API] Success — Resolved API_BASE_URL from Expo host:', resolvedUrl);
+    return resolvedUrl;
   }
 
-  // Fallback for simulators / web
-  return 'http://localhost:4001';
+  const fallbackUrl = 'http://localhost:4001';
+  console.warn('[API] Warning — Could not resolve host IP. Falling back to localhost:', fallbackUrl);
+  console.warn('[API] Note — If testing on a real device, you must set EXPO_PUBLIC_API_URL in apps/mobile/.env');
+  return fallbackUrl;
 }
 
 const API_BASE_URL = getApiBaseUrl();
+console.log('[API] Final API_BASE_URL =', API_BASE_URL);
+
 const TOKEN_KEY = 'apex_token';
 const REFRESH_TOKEN_KEY = 'apex_refresh_token';
 
@@ -87,7 +120,7 @@ export function setUnauthorizedHandler(cb: () => void) {
 
 export const api = createApiClient({
   baseUrl: API_BASE_URL,
-  getToken: () => _cachedToken,
+  getToken: loadToken,
   onUnauthorized: async () => {
     await clearToken();
     await clearRefreshToken();
@@ -99,14 +132,29 @@ export const api = createApiClient({
 
 export async function login(email: string, password: string) {
   console.log('[Auth] login() — attempting:', email);
+
   const res = await api.auth.login(email, password);
 
   if (res.success && res.data) {
     const data = res.data;
     await saveToken(data.token);
-    if (data.refreshToken) await saveRefreshToken(data.refreshToken);
-    console.log('[Auth] login() — success, token saved. user:', data.user?.id, 'onboardingComplete:', data.user?.onboardingComplete);
-    return { token: data.token, refreshToken: data.refreshToken, user: data.user };
+
+    if (data.refreshToken) {
+      await saveRefreshToken(data.refreshToken);
+    }
+
+    console.log(
+      '[Auth] login() — success, token saved. user:',
+      data.user?.id,
+      'onboardingComplete:',
+      data.user?.onboardingComplete
+    );
+
+    return {
+      token: data.token,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    };
   }
 
   console.warn('[Auth] login() — failed:', res.error);
@@ -114,23 +162,51 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(email: string, password: string, name: string) {
+  console.log('[Auth] register() — attempting:', email);
+
   const res = await api.auth.register(email, password, name);
 
   if (res.success && res.data) {
     const data = res.data;
     await saveToken(data.token);
-    if (data.refreshToken) await saveRefreshToken(data.refreshToken);
-    return { token: data.token, refreshToken: data.refreshToken, user: data.user };
+
+    if (data.refreshToken) {
+      await saveRefreshToken(data.refreshToken);
+    }
+
+    console.log(
+      '[Auth] register() — success, token saved. user:',
+      data.user?.id,
+      'onboardingComplete:',
+      data.user?.onboardingComplete
+    );
+
+    return {
+      token: data.token,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    };
   }
 
+  console.warn('[Auth] register() — failed:', res.error);
   throw new Error(res.error ?? 'Registration failed');
 }
 
 export async function logout() {
+  console.log('[Auth] logout() — starting');
+
   const refreshToken = await loadRefreshToken();
-  await api.auth.logout(refreshToken ?? undefined);
+
+  try {
+    await api.auth.logout(refreshToken ?? undefined);
+  } catch (error) {
+    console.warn('[Auth] logout() — API logout failed, clearing local tokens anyway:', error);
+  }
+
   await clearToken();
   await clearRefreshToken();
+
+  console.log('[Auth] logout() — local tokens cleared');
 }
 
 export default api;

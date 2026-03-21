@@ -18,8 +18,8 @@ export interface ApiResponse<T> {
 export interface ApiClientOptions {
   /** Base URL of the backend API (e.g. http://localhost:4000) */
   baseUrl: string;
-  /** Function to retrieve the stored auth token */
-  getToken: () => string | null;
+  /** Function to retrieve the stored auth token (can be async for React Native) */
+  getToken: () => string | null | Promise<string | null>;
   /** Called when a 401/403 is received — use to trigger logout */
   onUnauthorized?: () => void;
 }
@@ -34,7 +34,7 @@ export function createApiClient(options: ApiClientOptions) {
     path: string,
     body?: unknown
   ): Promise<ApiResponse<T>> {
-    const token = getToken();
+    const token = await getToken();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

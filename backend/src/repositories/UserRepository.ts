@@ -8,6 +8,7 @@ export interface CreateUserInput {
   firstName?: string;
   lastName?: string;
   roleId: string;
+  id?: string;
 }
 
 // ─── Repository ───────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export const UserRepository = {
         firstName: data.firstName,
         lastName: data.lastName,
         roleId: data.roleId,
+        id: data.id,
       },
       include: { role: true, onboardingProfile: true },
     });

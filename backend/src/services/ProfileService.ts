@@ -24,6 +24,12 @@ export const ProfileService = {
   async upsertOnboardingProfile(userId: string, data: any) {
     const { equipment, bodyStats, ...profileData } = data;
     
+    // Defensive check: Ensure user exists before upserting profile
+    const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      throw Object.assign(new Error(`User with ID ${userId} not found. Cannot create onboarding profile.`), { statusCode: 404 });
+    }
+
     return prisma.$transaction(async (tx) => {
       // 1. Upsert the base onboarding record
       // completedAt marks that the user has submitted their full profile.

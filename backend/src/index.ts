@@ -31,8 +31,15 @@ app.use('/api', apiLimiter);
 // ─── Request logging (dev) ────────────────────────────────────────────────────
 
 if (config.nodeEnv !== 'production') {
-  app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    const start = Date.now();
+    
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      console.log(`[${timestamp}] 📡 ${req.method} ${req.path} — ${res.statusCode} (${duration}ms)`);
+    });
+    
     next();
   });
 }
@@ -79,8 +86,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 
-app.listen(config.port, () => {
-  console.log(`Apex Protocol API running on http://localhost:${config.port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = config.port;
+  // Listening on '::' allows both IPv4 and IPv6 connections on most systems
+  app.listen(PORT, '::', () => {
+    console.log('────────────────────────────────────────────────────────────────');
+    console.log(`🚀 Apex Protocol API is LIVE`);
+    console.log(`📡 Listening on: [::]:${PORT}`);
+    console.log(`⚙️  Environment: ${config.nodeEnv}`);
+    console.log('────────────────────────────────────────────────────────────────');
+  });
+}
 
 export default app;

@@ -31,10 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Register global unauthorized handler — fires when any API call returns 401/403
   useEffect(() => {
-    setUnauthorizedHandler(() => {
+    setUnauthorizedHandler(async () => {
+      if (require('../constants/config').CONFIG.DEV_MODE) {
+        console.warn('[AuthContext] Session expired (DEV_MODE) — bypassing force-logout');
+        return;
+      }
+
+      console.warn('[AuthContext] Session expired — clearing state and redirecting');
+      
+      // Reset all auth state
       setUser(null);
       setOnboardingCompleteState(false);
       setSubscriptionActiveState(false);
+      
       // Delay alert so navigation has time to redirect to login first
       setTimeout(() => {
         Alert.alert(
@@ -61,8 +70,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSubscriptionActiveState(!!u.subscriptionActive);
             console.log('[AuthContext] restore() — session restored. user:', u.id, 'onboardingComplete:', u.onboardingComplete);
           } else if (!res.success) {
-            // Token exists but is invalid/expired — clear it silently
-            console.warn('[AuthContext] restore() — token invalid, remaining logged out:', res.error);
+            // Token exists but is invalid/expired — clear it and remain logged out
+            console.warn('[AuthContext] restore() — token invalid, clearing storage:', res.error);
+            const { clearToken, clearRefreshToken } = await import('../lib/api');
+            await clearToken();
+            await clearRefreshToken();
+            setUser(null);
           }
         }
       } catch (e) {
@@ -107,18 +120,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSubscriptionActiveState(active);
   }, []);
 
-  const loginDev = useCallback(() => {
-    setUser({
-      id: 'dev-user-001',
+  const loginDev = useCallback(async () => {
+    const mockUser: AuthUser = {
+      id: '00000000-0000-0000-0000-000000000000', // Matches backend stable mock ID
       email: 'dev@apexprotocol.io',
       name: 'Development User',
       firstName: 'Dev',
       lastName: 'User',
       onboardingComplete: false,
-      subscriptionActive: false,
-    });
+      subscriptionActive: true,
+    };
+    
+    // Save the dummy-token that the backend recognizes in dev mode
+    import('../lib/api').then(m => m.saveToken('dummy-token'));
+    
+    setUser(mockUser);
     setOnboardingCompleteState(false);
-    setSubscriptionActiveState(false);
+    setSubscriptionActiveState(true);
+    console.log('[AuthContext] loginDev() — Bypass active with stable mock token.');
   }, []);
 
   return (

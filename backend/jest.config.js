@@ -11,5 +11,6 @@ module.exports = {
     // Resolve workspace package to its source during tests
     '^@apex/shared$': '<rootDir>/../packages/shared/src/index.ts',
   },
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   clearMocks: true,
 };

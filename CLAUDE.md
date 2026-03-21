@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # CLAUDE.md - Apex Protocol AI Development Rules (Mobile-First)
 
 This document defines the strict development rules for AI agents working on the Apex Protocol project.
@@ -9,6 +13,77 @@ All generated code must be:
 - scalable
 - secure
 - maintainable
+
+---
+
+## 0. Development Commands
+
+### Starting Services
+
+```bash
+# Start both backend + mobile together
+npm run dev
+
+# Start individually
+npm run dev:backend       # backend on port 4001 (ts-node-dev, hot reload)
+npm run dev:mobile        # Expo (choose i=iOS / a=Android / w=web)
+```
+
+### Building
+
+```bash
+# IMPORTANT: Build shared package first — backend and mobile depend on its dist/
+npm run build:shared      # packages/shared → dist/
+
+npm run build:backend     # backend TypeScript → dist/
+```
+
+### Type Checking
+
+```bash
+npm run type-check                        # all workspaces
+cd backend && npm run type-check          # backend only
+cd apps/mobile && npm run type-check      # mobile only
+```
+
+### Backend Tests
+
+```bash
+cd backend
+npm test                  # run all tests (Jest)
+npm run test:watch        # watch mode
+npm run test:coverage     # with coverage report
+npx jest src/__tests__/AuthService.test.ts   # single test file
+```
+
+### Database (run from `backend/`)
+
+```bash
+npm run db:generate       # regenerate Prisma client after schema changes
+npm run db:migrate        # apply migrations in dev (creates migration file)
+npm run db:migrate:deploy # apply migrations in production (no prompt)
+npm run db:seed           # seed the database
+npm run db:reset          # wipe and re-migrate (destructive)
+npm run db:studio         # open Prisma Studio UI
+```
+
+### Environment Setup
+
+Backend: copy `backend/.env.example` → `backend/.env`
+
+```
+DATABASE_URL="postgresql://postgres:password@localhost:5432/apex_protocol"
+JWT_SECRET=<random string>
+PORT=4001
+```
+
+Mobile: copy `apps/mobile/.env.example` → `apps/mobile/.env`
+
+```
+EXPO_PUBLIC_API_URL=http://localhost:4001   # use LAN IP for real devices
+```
+
+> **Physical device note:** Leave `EXPO_PUBLIC_API_URL` unset and Expo will auto-detect your LAN IP via `Constants.expoGoConfig.debuggerHost`. Only set it explicitly when auto-detection fails.
 
 ---
 
@@ -196,6 +271,8 @@ Existing hooks (do not duplicate):
 | `useProfile` | `hooks/useProfile.ts` | Onboarding profile data |
 | `useProgress` | `hooks/useProgress.ts` | Dashboard analytics (strength, volume, adherence) |
 | `useProgression` | `hooks/useProgression.ts` | Weight progression prompts with optimistic updates |
+| `useWorkout` | `hooks/useWorkout.ts` | Today's workout data |
+| `useExercises` | `hooks/useExercises.ts` | Exercise library with search/filter |
 
 `useProgression` uses optimistic updates with ref-based rollback — follow this same pattern for any new mutation hooks.
 
@@ -283,6 +360,8 @@ RESTful APIs only.
 ---
 
 ## 12. API Client
+
+> **Critical:** `@apex/shared` must be built (`npm run build:shared`) before the backend or mobile app can import from it. The package exports from `dist/`, not `src/`. During tests, `jest.config.js` maps `@apex/shared` directly to the source to avoid this requirement.
 
 The API client is a factory defined in `packages/shared/src/api/client.ts` and instantiated in `apps/mobile/src/lib/api.ts`.
 
@@ -392,16 +471,16 @@ The onboarding screen (`OnboardingScreen.tsx`) has **15 steps** with a progress 
 | 2 | Primary goal (strength / muscle / body comp / weight loss / fitness / performance) |
 | 3 | Consistency level |
 | 4 | Experience level (beginner → advanced) |
-| 5 | Weekly workout days (2–6) |
-| 6 | Training environment (commercial gym → bodyweight only) |
-| 7 | Equipment selection (multiselect) |
-| 8 | Calibration intro |
-| 9 | Best lifts (5-rep max for squat, bench, deadlift, OH press) |
-| 10 | Body stats (Apple Health sync or manual) |
-| 11 | Notifications opt-in |
-| 12 | Referral source |
-| 13 | Finalization (triggers server-side program generation) |
-| 14 | Program summary |
+| 5 | Training environment (commercial gym → bodyweight only) |
+| 6 | Equipment selection (multiselect, at least 1 required) |
+| 7 | Calibration intro (informational) |
+| 8 | Best lifts (optional — 5-rep max for squat, bench, deadlift, OH press) |
+| 9 | Weekly training goal (days per week, optional) |
+| 10 | Notifications opt-in (optional) |
+| 11 | Body stats — Apple Health sync or manual entry (optional) |
+| 12 | Finalization (triggers server-side program generation + assignment) |
+| 13 | Program summary (display only) |
+| 14 | Conversion — value proposition / premium features (display only) |
 | 15 | Paywall (7-day trial, yearly/monthly billing) |
 
 Do not add or remove steps without updating this table.
