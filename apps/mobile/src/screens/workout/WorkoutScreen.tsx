@@ -1691,6 +1691,9 @@ export default function WorkoutScreen() {
             await new Promise(resolve => setTimeout(resolve, 1200));
             
             try {
+              // Persist the swap on the backend
+              await api.request('POST', '/api/workouts/swap', { workoutDayId: day.id });
+              
               setWorkout(prev => prev ? { ...prev, workoutDay: day } : null);
               setExercises(mapToExercises({ ...workout!, workoutDay: day }));
               console.log('[Swap] Workout update complete');
@@ -1701,8 +1704,8 @@ export default function WorkoutScreen() {
               console.log('[Swap] Loading state OFF');
             }
           }}
-          onPickMuscles={() => navigation.navigate('ExerciseSelection')}
-          onCreateCustom={() => navigation.navigate('ExerciseSelection')}
+          onPickMuscles={() => navigation.navigate('MuscleSelection')}
+          onCreateCustom={() => navigation.navigate('ExerciseSelection', { params: {} } as any)}
         />
 
         <ExercisePicker

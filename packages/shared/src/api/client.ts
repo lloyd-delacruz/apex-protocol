@@ -161,6 +161,9 @@ export function createApiClient(options: ApiClientOptions) {
           }>;
         } | null;
       }>('GET', '/api/workouts/today'),
+    
+    swapWorkout: (workoutDayId: string) =>
+      request<unknown>('POST', '/api/workouts/swap', { workoutDayId }),
 
     getByWeekAndDay: (programId: string, week: number, day: number) =>
       request<{ workoutDay: unknown }>('GET', `/api/workouts/${programId}/${week}/${day}`),

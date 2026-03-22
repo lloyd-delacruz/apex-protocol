@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SessionStackParamList } from './types';
 import WorkoutScreen from '../screens/workout/WorkoutScreen';
 import ExerciseSelectionScreen from '../screens/workout/ExerciseSelectionScreen';
+import MuscleSelectionScreen from '../screens/workout/MuscleSelectionScreen';
 
 const Stack = createNativeStackNavigator<SessionStackParamList>();
 
@@ -11,6 +12,7 @@ export default function SessionNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="WorkoutMain" component={WorkoutScreen} />
       <Stack.Screen name="ExerciseSelection" component={ExerciseSelectionScreen} />
+      <Stack.Screen name="MuscleSelection" component={MuscleSelectionScreen} />
     </Stack.Navigator>
   );
 }

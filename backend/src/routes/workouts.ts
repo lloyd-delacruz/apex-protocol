@@ -171,6 +171,27 @@ router.post(
   }
 );
 
+// POST /api/workouts/swap — manually swap today's workout
+router.post(
+  '/swap',
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const { workoutDayId } = req.body;
+
+    if (!workoutDayId) {
+      res.status(400).json({ success: false, error: 'workoutDayId is required', data: null });
+      return;
+    }
+
+    try {
+      const result = await WorkoutService.swapWorkout(req.userId!, workoutDayId);
+      res.json({ success: true, data: result, error: null });
+    } catch (err: unknown) {
+      handleError(err, res);
+    }
+  }
+);
+
 // DELETE /api/workouts/session/exercises/:sessionExerciseId — remove exercise from session
 router.delete(
   '/session/exercises/:sessionExerciseId',

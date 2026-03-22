@@ -225,6 +225,8 @@ model UserProgramAssignment {
   isActive   Boolean   @default(true) @map("is_active")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
+  overrideWorkoutDayId   String?   @map("override_workout_day_id") @db.Uuid
+  overrideWorkoutDate    DateTime? @map("override_workout_date") @db.Date
   program    Program   @relation(fields: [programId], references: [id])
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 

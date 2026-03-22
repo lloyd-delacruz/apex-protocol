@@ -10,7 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
@@ -19,35 +19,49 @@ import type { ExerciseItem } from '../../types/api';
 import type { SessionStackParamList } from '../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<SessionStackParamList, 'ExerciseSelection'>;
+type ExerciseSelectionRouteProp = RouteProp<SessionStackParamList, 'ExerciseSelection'>;
 
 export default function ExerciseSelectionScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<ExerciseSelectionRouteProp>();
+  const initialMuscle = route.params?.muscleGroup;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedExercises, setSelectedExercises] = useState<Set<string>>(new Set());
 
-  const fetchExercises = useCallback(async (query?: string) => {
+  const fetchExercises = useCallback(async (query?: string, muscle?: string) => {
     setLoading(true);
     try {
-      const endpoint = query 
-        ? `/api/exercises/search?q=${encodeURIComponent(query)}` 
-        : `/api/exercises`;
+      let endpoint = '/api/exercises';
+      if (query) {
+        endpoint = `/api/exercises/search?q=${encodeURIComponent(query)}`;
+      } else if (muscle) {
+        endpoint = `/api/exercises/search?q=${encodeURIComponent(muscle)}`;
+      }
+      
+      console.log('[ExerciseSelectionScreen] fetching:', endpoint);
       const res = await api.request<{ exercises: ExerciseItem[] }>('GET', endpoint);
       if (res.success) setExercises(res.data?.exercises || []);
-    } catch { 
-      // ignore
+    } catch (err) { 
+      console.error('[ExerciseSelectionScreen] fetch error:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // If we have an initial muscle but NO search query yet, search for the muscle.
+    // Otherwise, use the search query.
+    const q = searchQuery.length > 0 ? searchQuery : undefined;
+    const m = (searchQuery.length === 0 && initialMuscle) ? initialMuscle : undefined;
+
     const t = setTimeout(() => {
-      fetchExercises(searchQuery);
+      fetchExercises(q, m);
     }, 300);
     return () => clearTimeout(t);
-  }, [searchQuery, fetchExercises]);
+  }, [searchQuery, initialMuscle, fetchExercises]);
 
   const toggleSelect = (ex: ExerciseItem) => {
     setSelectedExercises(prev => {
@@ -104,15 +118,20 @@ export default function ExerciseSelectionScreen() {
             <Ionicons name="search" size={18} color={colors.textMuted} />
             <TextInput
               style={s.searchInput}
-              placeholder="Search exercises..."
+              placeholder={initialMuscle ? `Filter: ${initialMuscle}...` : "Search exercises..."}
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
               autoCorrect={false}
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+            {(searchQuery.length > 0 || initialMuscle) && (
+              <TouchableOpacity onPress={() => {
+                setSearchQuery('');
+                if (initialMuscle) {
+                  navigation.setParams({ muscleGroup: undefined });
+                }
+              }}>
                 <Ionicons name="close-circle" size={18} color={colors.textMuted} />
               </TouchableOpacity>
             )}

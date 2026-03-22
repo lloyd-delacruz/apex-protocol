@@ -17,6 +17,7 @@ import { CONFIG } from '../constants/config';
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator from './MainNavigator';
+import SessionNavigator from './SessionNavigator';
 import { SplashScreen } from '../components/common/SplashScreen';
 import type { RootNavigatorParamList } from './types';
 
@@ -92,7 +93,10 @@ export default function RootNavigator() {
       ) : !onboardingComplete ? (
         <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
       ) : (
-        <RootStack.Screen name="Main" component={MainNavigator} />
+        <>
+          <RootStack.Screen name="Main" component={MainNavigator} />
+          <RootStack.Screen name="Session" component={SessionNavigator} />
+        </>
       )}
     </RootStack.Navigator>
   );

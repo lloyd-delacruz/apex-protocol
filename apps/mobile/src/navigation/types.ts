@@ -52,7 +52,8 @@ export type WorkoutStackParamList = {
 
 export type SessionStackParamList = {
   WorkoutMain: undefined;
-  ExerciseSelection: undefined;
+  ExerciseSelection: { muscleGroup?: string };
+  MuscleSelection: undefined;
 };
 
 export type ProgressStackParamList = {
@@ -81,4 +82,5 @@ export type RootNavigatorParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
+  Session: NavigatorScreenParams<SessionStackParamList>;
 };

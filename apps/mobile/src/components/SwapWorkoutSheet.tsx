@@ -29,6 +29,36 @@ function ExerciseImage({ uri, style }: { uri: string; style: any }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const CATEGORY_IMAGES: Record<string, string> = {
+  'upper': 'https://images.unsplash.com/photo-1581009146145-b5ef03a7403f?auto=format&fit=crop&w=400&q=80',
+  'lower': 'https://images.unsplash.com/photo-1574673130244-c707aaac4848?auto=format&fit=crop&w=400&q=80',
+  'full': 'https://images.unsplash.com/photo-1541534741688-6078c65b5a33?auto=format&fit=crop&w=400&q=80',
+  'push': 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=400&q=80',
+  'pull': 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=400&q=80',
+  'legs': 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?auto=format&fit=crop&w=400&q=80',
+  'rest': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
+  'hypertrophy': 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=400&q=80',
+  'strength': 'https://images.unsplash.com/photo-1581009146145-b5ef03a7403f?auto=format&fit=crop&w=400&q=80',
+};
+
+function getCategoryThumbnail(workoutType: string) {
+  const type = workoutType.toLowerCase();
+  
+  if (type.includes('upper')) return CATEGORY_IMAGES['upper'];
+  if (type.includes('lower')) return CATEGORY_IMAGES['lower'];
+  if (type.includes('push')) return CATEGORY_IMAGES['push'];
+  if (type.includes('pull')) return CATEGORY_IMAGES['pull'];
+  if (type.includes('legs')) return CATEGORY_IMAGES['legs'];
+  if (type.includes('full')) return CATEGORY_IMAGES['full'];
+  if (type.includes('rest') || type.includes('recovery')) return CATEGORY_IMAGES['rest'];
+  if (type.includes('hypertrophy')) return CATEGORY_IMAGES['hypertrophy'];
+  if (type.includes('strength')) return CATEGORY_IMAGES['strength'];
+  
+  return null;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export interface SwapWorkoutSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -82,7 +112,10 @@ export default function SwapWorkoutSheet({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Swap Workout</Text>
+            <View>
+              <Text style={styles.title}>Swap Workout</Text>
+              <Text style={styles.subtitle}>Choose your focus for today</Text>
+            </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={26} color={colors.textMuted} />
             </TouchableOpacity>
@@ -99,6 +132,7 @@ export default function SwapWorkoutSheet({
               ) : (
                 splitDays.map((day) => {
                   const isSelected = day.id === currentWorkoutDayId;
+                  const categoryThumb = getCategoryThumbnail(day.workoutType);
                   const firstExMedia = day.exercisePrescriptions?.[0]?.exercise?.mediaUrl;
                   
                   return (
@@ -111,11 +145,14 @@ export default function SwapWorkoutSheet({
                       onPress={() => { onSelectDay(day); }}
                     >
                       <View style={styles.dayThumb}>
-                        {firstExMedia ? (
+                        {categoryThumb ? (
+                          <ExerciseImage uri={categoryThumb} style={StyleSheet.absoluteFill} />
+                        ) : firstExMedia ? (
                           <ExerciseImage uri={firstExMedia} style={StyleSheet.absoluteFill} />
                         ) : (
                           <Ionicons name="barbell-outline" size={24} color={colors.textMuted} />
                         )}
+                        {categoryThumb && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.2)' }]} />}
                         {isSelected && (
                           <View style={styles.dayCheckBadge}>
                             <Ionicons name="checkmark-circle" size={16} color={colors.brandPrimary} />
@@ -126,7 +163,11 @@ export default function SwapWorkoutSheet({
                         <Text style={[styles.dayName, isSelected && { color: colors.brandPrimary, fontWeight: '700' }]}>
                           {day.workoutType}
                         </Text>
-                        {isSelected && <Text style={styles.currentStatusText}>CURRENT WORKOUT</Text>}
+                        {isSelected ? (
+                          <Text style={styles.currentStatusText}>CURRENT SELECTION</Text>
+                        ) : (
+                          <Text style={styles.dayStatsText}>{day.exercisePrescriptions?.length || 0} Exercises</Text>
+                        )}
                       </View>
                       <View style={[styles.radio, isSelected && styles.radioActive]}>
                         {isSelected && <View style={styles.radioInner} />}
@@ -213,6 +254,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   title: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, flex: 1 },
+  subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -250,6 +292,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dayName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  dayStatsText: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   currentStatusText: { fontSize: 11, color: colors.brandPrimary, fontWeight: '500', marginTop: 1 },
   radio: {
     width: 24,

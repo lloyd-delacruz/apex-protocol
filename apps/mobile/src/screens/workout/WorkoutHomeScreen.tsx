@@ -17,9 +17,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { WorkoutStackParamList } from '../../navigation/types';
+import { WorkoutStackParamList, RootNavigatorParamList, SessionStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -114,7 +114,10 @@ function getMuscleIcon(muscle: string | null): any {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function WorkoutHomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<WorkoutStackParamList>>();
+  const navigation = useNavigation<CompositeNavigationProp<
+    NativeStackNavigationProp<WorkoutStackParamList>,
+    NativeStackNavigationProp<RootNavigatorParamList>
+  >>();
   const { user: authUser } = useAuth();
   const { data: todayWorkout, loading: loadingWorkout, error: workoutError, refresh: refreshWorkout } = useTodayWorkout();
   const { profile } = useProfile();
@@ -163,9 +166,18 @@ export default function WorkoutHomeScreen() {
 
   useEffect(() => {
     if (todayWorkout?.program && todayWorkout?.currentWeek) {
+      console.log('[WorkoutHomeScreen] fetching week days for program:', todayWorkout.program.id, 'week:', todayWorkout.currentWeek.absoluteWeekNumber);
       fetchWeekDays(todayWorkout.program.id, todayWorkout.currentWeek.absoluteWeekNumber);
     }
   }, [todayWorkout, fetchWeekDays]);
+
+  useEffect(() => {
+    if (currentWeekDays.length > 0) {
+      console.log('[WorkoutHomeScreen] currentWeekDays updated:', currentWeekDays.map(d => d.workoutType));
+    } else if (!loadingWeek) {
+      console.warn('[WorkoutHomeScreen] currentWeekDays is empty!');
+    }
+  }, [currentWeekDays, loadingWeek]);
 
   const workoutDay = todayWorkout?.workoutDay;
   const exercises = workoutDay?.exercisePrescriptions ?? [];
@@ -335,7 +347,7 @@ export default function WorkoutHomeScreen() {
           <View style={styles.stickyFooter}>
             <TouchableOpacity
               style={styles.startBtn}
-              onPress={() => navigation.navigate('Workout' as never)}
+              onPress={() => navigation.navigate('Session', { screen: 'WorkoutMain' })}
               activeOpacity={0.9}
             >
               <Text style={styles.startBtnText}>Start Workout</Text>
@@ -434,6 +446,8 @@ export default function WorkoutHomeScreen() {
           await new Promise(resolve => setTimeout(resolve, 1200));
 
           try {
+            // Direct request to ensure it works even if shared types are lagging
+            await api.request('POST', '/api/workouts/swap', { workoutDayId: day.id });
             await refreshWorkout();
             console.log('[Swap] Workout update complete');
           } catch (err) {
@@ -443,8 +457,8 @@ export default function WorkoutHomeScreen() {
             console.log('[Swap] Loading state OFF');
           }
         }}
-        onPickMuscles={() => navigation.navigate('Workout' as never)}
-        onCreateCustom={() => navigation.navigate('Workout' as never)}
+        onPickMuscles={() => navigation.navigate('Session', { screen: 'MuscleSelection' })}
+        onCreateCustom={() => navigation.navigate('Session', { screen: 'ExerciseSelection', params: {} })}
       />
       <GeneratingWorkoutModal visible={isGenerating} />
     </View>
