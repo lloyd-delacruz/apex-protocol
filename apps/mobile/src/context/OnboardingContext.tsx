@@ -45,8 +45,9 @@ export interface OnboardingState {
 interface OnboardingContextValue {
   state: OnboardingState;
   updateState: (updates: Partial<OnboardingState>) => void;
-  nextStep: () => void;
+  nextStep: (step?: number) => void;
   prevStep: () => void;
+  goToStep: (step: number) => void;
   resetOnboarding: () => void;
   syncToBackend: () => Promise<void>;
   generateProgram: () => Promise<string>;
@@ -112,8 +113,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
-  const nextStep = useCallback(() => {
-    setState((prev) => ({ ...prev, step: Math.min(prev.step + 1, 15) }));
+  const nextStep = useCallback((step?: number) => {
+    setState((prev) => ({ 
+      ...prev, 
+      step: step !== undefined ? step : Math.min(prev.step + 1, 15) 
+    }));
+  }, []);
+
+  const goToStep = useCallback((step: number) => {
+    setState((prev) => ({ ...prev, step: Math.max(1, Math.min(step, 15)) }));
   }, []);
 
   const prevStep = useCallback(() => {
@@ -254,6 +262,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         updateState,
         nextStep,
         prevStep,
+        goToStep,
         resetOnboarding,
         syncToBackend,
         generateProgram,

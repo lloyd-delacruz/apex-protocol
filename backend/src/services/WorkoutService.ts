@@ -170,14 +170,22 @@ export const WorkoutService = {
       const exercise = await prisma.exercise.findUnique({ where: { id: exerciseId } });
       if (exercise) {
         // Find a matching best lift
-        const match = bestLifts.find(
-          (bl) =>
-            bl.exerciseName.toLowerCase() === exercise.name.toLowerCase() ||
-            (exercise.name.toLowerCase().includes('squat') && bl.exerciseName.toLowerCase().includes('squat')) ||
-            (exercise.name.toLowerCase().includes('bench') && bl.exerciseName.toLowerCase().includes('bench press')) ||
-            (exercise.name.toLowerCase().includes('deadlift') && bl.exerciseName.toLowerCase().includes('deadlift')) ||
-            (exercise.name.toLowerCase().includes('press') && bl.exerciseName.toLowerCase().includes('press')),
-        );
+        const match = bestLifts.find((bl) => {
+          if (!bl) return false;
+          const name = bl.exerciseName || bl.exercise;
+          if (!name || typeof name !== 'string') return false;
+          
+          const lowerName = name.toLowerCase();
+          const targetName = exercise.name.toLowerCase();
+
+          return (
+            lowerName === targetName ||
+            (targetName.includes('squat') && lowerName.includes('squat')) ||
+            (targetName.includes('bench') && lowerName.includes('bench press')) ||
+            (targetName.includes('deadlift') && lowerName.includes('deadlift')) ||
+            (targetName.includes('press') && lowerName.includes('press'))
+          );
+        });
 
         if (match && match.weight > 0) {
           // Epley 1RM Est: 1RM = weight * (1 + reps/30)
