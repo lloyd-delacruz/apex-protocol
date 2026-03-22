@@ -1,15 +1,13 @@
 {
   "expo": {
-    "name": "Apex Protocol",
-    "slug": "apex-protocol",
+    "name": "Apex Elite",
+    "slug": "apex-elite",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0F"
+      "backgroundColor": "#06060A"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -20,8 +18,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A0A0F"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#06060A"
       },
       "package": "com.apexprotocol.app"
     },

@@ -5,9 +5,9 @@ import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { useTodayWorkout } from '../../hooks/useWorkout';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DashboardStackParamList } from '../../navigation/types';
+import { WorkoutStackParamList } from '../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<DashboardStackParamList>;
+type NavigationProp = NativeStackNavigationProp<WorkoutStackParamList>;
 
 export default function PlanDetailsScreen() {
   const navigation = useNavigation<NavigationProp>();

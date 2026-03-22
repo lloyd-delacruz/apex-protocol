@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -297,39 +299,116 @@ const StepCalibrationIntro = ({ onNext, onPrev }: StepProps) => (
 const StepBestLifts = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
   const lifts = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'];
+  const inputRefs = useRef<Record<string, TextInput | null>>({});
 
-  const updateLift = (name: string, weight: string) => {
-    const numeric = parseInt(weight, 10) || 0;
-    const next = [...state.bestLifts.filter(l => l.exercise !== name), { exercise: name, reps: 5, weight: numeric, unit: state.bodyStats.unit as 'kg' | 'lbs' }];
-    updateState({ bestLifts: next });
+  // Initialize local state from context to show existing values if returning to this step
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    lifts.forEach(lift => {
+      const existing = state.bestLifts.find(l => l.exercise === lift);
+      // We store as string to allow users to clear the input and type freely
+      initial[lift] = existing && existing.weight > 0 ? existing.weight.toString() : '';
+    });
+    return initial;
+  });
+
+  const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const currentUnit = state.bodyStats.unit;
+  const isFormValid = lifts.every(lift => values[lift] && parseInt(values[lift], 10) > 0);
+
+  const handleContinue = () => {
+    if (!isFormValid) {
+      setError('Please enter a weight for all exercises.');
+      return;
+    }
+
+    // Only parse and sync on continue to avoid re-renders while typing
+    const nextLifts = lifts.map(lift => ({
+      exercise: lift,
+      reps: 5,
+      weight: parseInt(values[lift], 10) || 0,
+      unit: currentUnit as 'kg' | 'lbs'
+    }));
+    updateState({ bestLifts: nextLifts });
+    onNext();
   };
 
   return (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Enter your{'\n'}<Text style={styles.italic}>best lifts</Text></Text>
-      <Text style={styles.subtitle}>Approximate 5-rep max weight</Text>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {lifts.map(lift => (
-          <View key={lift} style={styles.inputCard}>
-            <Text style={styles.inputLabel}>{lift}</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="0"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-                onChangeText={(v) => updateLift(lift, v)}
-              />
-              <Text style={styles.unitText}>{state.bodyStats.unit}</Text>
+      
+      <View style={[styles.toggleContainer, { marginBottom: 20 }]}>
+         <TouchableOpacity 
+           style={[styles.toggleButton, currentUnit === 'lbs' && styles.toggleButtonActive]}
+           onPress={() => updateState({ bodyStats: { ...state.bodyStats, unit: 'lbs' } })}
+         >
+           <Text style={[styles.toggleText, currentUnit === 'lbs' && styles.toggleTextActive]}>LBS</Text>
+         </TouchableOpacity>
+         <TouchableOpacity 
+           style={[styles.toggleButton, currentUnit === 'kg' && styles.toggleButtonActive]}
+           onPress={() => updateState({ bodyStats: { ...state.bodyStats, unit: 'kg' } })}
+         >
+           <Text style={[styles.toggleText, currentUnit === 'kg' && styles.toggleTextActive]}>KG</Text>
+         </TouchableOpacity>
+      </View>
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {lifts.map((lift, index) => {
+          const isFocused = focusedField === lift;
+          return (
+            <View 
+              key={lift} 
+              style={[
+                styles.inputCard, 
+                isFocused && styles.inputCardFocused
+              ]}
+            >
+              <Text style={[styles.inputLabel, isFocused && { color: colors.brandPrimary }]}>{lift}</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  ref={el => { inputRefs.current[lift] = el; }}
+                  style={styles.textInput}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="decimal-pad"
+                  returnKeyType={index === lifts.length - 1 ? 'done' : 'next'}
+                  value={values[lift]}
+                  onFocus={() => setFocusedField(lift)}
+                  onBlur={() => setFocusedField(null)}
+                  onChangeText={(v) => {
+                    setValues(prev => ({ ...prev, [lift]: v }));
+                    if (error) setError(null);
+                  }}
+                  onSubmitEditing={() => {
+                    if (index < lifts.length - 1) {
+                      inputRefs.current[lifts[index + 1]]?.focus();
+                    } else if (isFormValid) {
+                      handleContinue();
+                    }
+                  }}
+                  blurOnSubmit={index === lifts.length - 1}
+                />
+                <Text style={[styles.unitText, isFocused && { color: colors.textPrimary }]}>{currentUnit}</Text>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
+        {error && (
+          <Text style={styles.errorText}>{error}</Text>
+        )}
       </ScrollView>
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.secondaryButton} onPress={onPrev}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.brandButton, { flex: 2 }]} onPress={onNext}>
+        <TouchableOpacity 
+          style={[styles.brandButton, { flex: 2 }, !isFormValid && styles.buttonDisabled]} 
+          onPress={handleContinue}
+        >
           <Text style={styles.brandButtonText}>CONTINUE</Text>
         </TouchableOpacity>
       </View>
@@ -395,6 +474,48 @@ const StepNotifications = ({ onNext, onPrev }: StepProps) => {
 
 const StepBodyStats = ({ onNext, onPrev }: StepProps) => {
   const { state, updateState } = useOnboarding();
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // DOB Parts for better UX
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobDay, setDobDay] = useState('');
+  const [dobYear, setDobYear] = useState('');
+
+  const monthRef = useRef<TextInput>(null);
+  const dayRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
+
+  const genderOptions = ['Male', 'Female', 'Non-binary', 'Other'];
+
+  const isFormValid = state.bodyStats.gender && 
+                      dobMonth.length === 2 && 
+                      dobDay.length === 2 && 
+                      dobYear.length === 4;
+
+  const handleNext = () => {
+    if (!state.bodyStats.gender) {
+      setError('Please select your gender.');
+      return;
+    }
+    if (!isFormValid) {
+      setError('Please provide a valid date of birth (MM/DD/YYYY).');
+      return;
+    }
+    
+    // Validate date logic simple check
+    const m = parseInt(dobMonth, 10);
+    const d = parseInt(dobDay, 10);
+    const y = parseInt(dobYear, 10);
+    if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1920 || y > 2024) {
+      setError('Please enter a realistic date of birth.');
+      return;
+    }
+
+    updateState({ bodyStats: { ...state.bodyStats, dob: `${dobMonth}/${dobDay}/${dobYear}` } });
+    onNext();
+  };
+
   return (
     <View style={styles.stepContainer}>
       <View style={styles.headerRow}>
@@ -402,12 +523,13 @@ const StepBodyStats = ({ onNext, onPrev }: StepProps) => {
           <Text style={{ color: colors.brandPrimary, fontSize: 18 }}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Your Body Stats</Text>
-        <TouchableOpacity onPress={onNext}>
-          <Text style={{ color: colors.brandPrimary, fontSize: 16 }}>Skip</Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.syncCard}>
           <Text style={[styles.title, { fontSize: 28 }]}>Sync with{'\n'}<Text style={styles.italic}>Apple Health</Text></Text>
           <View style={styles.bulletRow}>
@@ -435,9 +557,6 @@ const StepBodyStats = ({ onNext, onPrev }: StepProps) => {
           <TouchableOpacity style={styles.whiteButton} onPress={() => {}}>
              <Text style={styles.whiteButtonText}>Sync with Apple Health</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ alignSelf: 'center', marginTop: 12 }}>
-             <Text style={{ color: colors.brandPrimary, fontWeight: '600' }}>Learn More</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.dividerRow}>
@@ -446,39 +565,103 @@ const StepBodyStats = ({ onNext, onPrev }: StepProps) => {
           <View style={styles.dividerLine} />
         </View>
 
-        <Text style={[styles.title, { fontSize: 24, marginBottom: 4 }]}>Enter manually</Text>
-        <Text style={[styles.subtitle, { marginBottom: 12 }]}>Optional and can be added later</Text>
+        <Text style={[styles.title, { fontSize: 24, marginBottom: 16 }]}>Enter manually</Text>
         
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Gender</Text>
-          <View style={styles.inputRow}>
+        <Text style={[styles.inputLabel, { marginBottom: 12 }]}>Gender</Text>
+        <View style={styles.genderGrid}>
+          {genderOptions.map(option => (
+            <TouchableOpacity 
+              key={option}
+              style={[
+                styles.genderOption,
+                state.bodyStats.gender === option && styles.genderOptionActive
+              ]}
+              onPress={() => {
+                updateState({ bodyStats: { ...state.bodyStats, gender: option } });
+                if (error) setError(null);
+                monthRef.current?.focus();
+              }}
+            >
+              <Text style={[
+                styles.genderOptionText,
+                state.bodyStats.gender === option && styles.genderOptionTextActive
+              ]}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.inputLabel, { marginTop: 24, marginBottom: 12 }]}>Date of Birth</Text>
+        <View style={styles.dobContainer}>
+          <View style={[styles.dobField, focusedField === 'mm' && styles.dobFieldFocused]}>
             <TextInput
-              style={styles.textInput}
-              placeholder="Select Gender"
+              ref={monthRef}
+              style={styles.dobInput}
+              placeholder="MM"
               placeholderTextColor={colors.textMuted}
-              value={state.bodyStats.gender}
-              onChangeText={(v) => updateState({ bodyStats: { ...state.bodyStats, gender: v } })}
+              keyboardType="number-pad"
+              maxLength={2}
+              value={dobMonth}
+              onFocus={() => setFocusedField('mm')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={(v) => {
+                setDobMonth(v);
+                if (v.length === 2) dayRef.current?.focus();
+                if (error) setError(null);
+              }}
             />
-            <Text style={{ color: colors.textMuted }}>▼</Text>
+          </View>
+          <Text style={styles.dobSeparator}>/</Text>
+          <View style={[styles.dobField, focusedField === 'dd' && styles.dobFieldFocused]}>
+            <TextInput
+              ref={dayRef}
+              style={styles.dobInput}
+              placeholder="DD"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={2}
+              value={dobDay}
+              onFocus={() => setFocusedField('dd')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={(v) => {
+                setDobDay(v);
+                if (v.length === 2) yearRef.current?.focus();
+                if (v.length === 0) monthRef.current?.focus();
+                if (error) setError(null);
+              }}
+            />
+          </View>
+          <Text style={styles.dobSeparator}>/</Text>
+          <View style={[styles.dobField, { flex: 1.5 }, focusedField === 'yyyy' && styles.dobFieldFocused]}>
+            <TextInput
+              ref={yearRef}
+              style={styles.dobInput}
+              placeholder="YYYY"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={4}
+              value={dobYear}
+              onFocus={() => setFocusedField('yyyy')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={(v) => {
+                setDobYear(v);
+                if (v.length === 0) dayRef.current?.focus();
+                if (error) setError(null);
+              }}
+              onSubmitEditing={handleNext}
+              returnKeyType="done"
+            />
           </View>
         </View>
 
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Date of Birth</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="MM / DD / YYYY"
-              placeholderTextColor={colors.textMuted}
-              value={state.bodyStats.dob}
-              onChangeText={(v) => updateState({ bodyStats: { ...state.bodyStats, dob: v } })}
-            />
-            <Text style={{ color: colors.textMuted }}>▼</Text>
-          </View>
-        </View>
+        {error && (
+          <Text style={[styles.errorText, { marginVertical: 20 }]}>{error}</Text>
+        )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.brandButton} onPress={onNext}>
+      <TouchableOpacity 
+        style={[styles.brandButton, !isFormValid && styles.buttonDisabled]} 
+        onPress={handleNext}
+      >
         <Text style={styles.brandButtonText}>NEXT</Text>
       </TouchableOpacity>
     </View>
@@ -733,8 +916,14 @@ export default function OnboardingScreen() {
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={{ flex: 1 }}>
-        <ProgressBar progress={progress} />
-        {renderStep()}
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ProgressBar progress={progress} />
+          {renderStep()}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -860,7 +1049,14 @@ const styles = StyleSheet.create({
   },
   inputLabel: { fontSize: 14, color: colors.textMuted, marginBottom: 8 },
   inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  textInput: { color: colors.textPrimary, fontSize: 20, fontWeight: '700', padding: 0 },
+  textInput: { 
+    flex: 1,
+    color: colors.textPrimary, 
+    fontSize: 20, 
+    fontWeight: '700', 
+    padding: 0,
+    minHeight: 48,
+  },
   unitText: { color: colors.textMuted, fontSize: 16, fontWeight: '600' },
   // Days Grid
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
@@ -937,4 +1133,71 @@ const styles = StyleSheet.create({
   loginCardText: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', fontStyle: 'italic' },
   termsText: { textAlign: 'center', color: colors.textMuted, fontSize: 12, lineHeight: 18, paddingHorizontal: 20 },
   linkText: { color: colors.textPrimary, textDecorationLine: 'underline' },
+  errorText: { color: '#FF4444', fontSize: 14, textAlign: 'center', marginTop: 8, fontWeight: '600' },
+  inputCardFocused: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.brandPrimary,
+    borderWidth: 1,
+    shadowColor: colors.brandPrimary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  genderGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  genderOption: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    minWidth: '45%',
+    alignItems: 'center',
+  },
+  genderOptionActive: {
+    backgroundColor: 'rgba(0,180,255,0.15)',
+    borderColor: colors.brandPrimary,
+  },
+  genderOptionText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  genderOptionTextActive: {
+    color: colors.brandPrimary,
+  },
+  dobContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dobField: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dobFieldFocused: {
+    borderColor: colors.brandPrimary,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  dobInput: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  dobSeparator: {
+    color: colors.textMuted,
+    fontSize: 20,
+    fontWeight: '300',
+  },
 });

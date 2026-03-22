@@ -2,14 +2,13 @@
  * Main Navigator
  *
  * Bottom tab navigator for authenticated + onboarded users.
-- * 5 tabs: Workout · Progress · Body · Log
-- *
-- *   Workout    →  DashboardScreen   (barbell icon - renamed from Dashboard)
-- *   Session    →  WorkoutScreen     (flash icon - renamed from Workout)
-- *   Targets    →  ProgressScreen    (disc icon - renamed from Progress)
-- *   Body       →  BodyNavigator     (body icon — stack: Body + Targets)
-- *   Log        →  LogScreen         (calendar icon)
-- */
+ * 4 tabs: Workout · Body · Progress · Log
+ *
+ *   Workout  →  WorkoutNavigator  (barbell icon — stack: WorkoutHomeScreen + PlanDetails)
+ *   Body     →  BodyNavigator     (body icon — stack: Body + Targets)
+ *   Progress →  TargetsScreen     (disc icon)
+ *   Log      →  LogScreen         (calendar icon)
+ */
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -30,11 +29,10 @@ const TAB_ICONS: Record<
   keyof MainTabParamList,
   { active: React.ComponentProps<typeof Ionicons>['name']; inactive: React.ComponentProps<typeof Ionicons>['name'] }
 > = {
-  Dashboard: { active: 'barbell',     inactive: 'barbell-outline' },
-  Workout:   { active: 'flash',       inactive: 'flash-outline' },
-  Progress:  { active: 'disc',        inactive: 'disc-outline' },
-  Body:      { active: 'body',        inactive: 'body-outline' },
-  Log:       { active: 'calendar',    inactive: 'calendar-outline' },
+  Workout:  { active: 'barbell',  inactive: 'barbell-outline' },
+  Progress: { active: 'disc',     inactive: 'disc-outline' },
+  Body:     { active: 'body',     inactive: 'body-outline' },
+  Log:      { active: 'calendar', inactive: 'calendar-outline' },
 };
 
 // ─── Navigator ────────────────────────────────────────────────────────────────
@@ -66,10 +64,9 @@ export default function MainNavigator() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Dashboard" 
-        component={WorkoutNavigator} 
-        options={{ tabBarLabel: 'Workout' }} 
+      <Tab.Screen
+        name="Workout"
+        component={WorkoutNavigator}
       />
       <Tab.Screen
         name="Body"

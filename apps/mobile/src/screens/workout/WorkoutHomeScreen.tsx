@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DashboardStackParamList } from '../../navigation/types';
+import { WorkoutStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -46,16 +46,16 @@ function Pillar({ label, icon, onPress }: { label: string; icon?: string; onPres
   );
 }
 
-function ExerciseCard({ 
-  exercise, 
-  index, 
-  isLast, 
-  isFocus, 
-  onMenuPress 
-}: { 
-  exercise: any; 
-  index: number; 
-  isLast: boolean; 
+function ExerciseCard({
+  exercise,
+  index,
+  isLast,
+  isFocus,
+  onMenuPress
+}: {
+  exercise: any;
+  index: number;
+  isLast: boolean;
   isFocus: boolean;
   onMenuPress: () => void;
 }) {
@@ -63,21 +63,21 @@ function ExerciseCard({
     <View style={styles.exerciseCardContainer}>
       {/* Connector Line */}
       {!isLast && <View style={styles.connectorLine} />}
-      
+
       <View style={styles.exerciseCardInner}>
         {/* Thumbnail Section */}
         <View style={styles.thumbnailWrapper}>
-          <Image 
-            source={{ uri: exercise.exercise.mediaUrl || 'https://via.placeholder.com/150' }} 
+          <Image
+            source={{ uri: exercise.exercise.mediaUrl || 'https://via.placeholder.com/150' }}
             style={styles.thumbnail}
             resizeMode="cover"
           />
           {/* Muscle Badge Overlay */}
           <View style={styles.muscleBadge}>
-            <MaterialCommunityIcons 
-              name={getMuscleIcon(exercise.exercise.muscleGroup)} 
-              size={12} 
-              color="#fff" 
+            <MaterialCommunityIcons
+              name={getMuscleIcon(exercise.exercise.muscleGroup)}
+              size={12}
+              color="#fff"
             />
           </View>
         </View>
@@ -113,12 +113,12 @@ function getMuscleIcon(muscle: string | null): any {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
-export default function DashboardScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<DashboardStackParamList>>();
+export default function WorkoutHomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<WorkoutStackParamList>>();
   const { user: authUser } = useAuth();
   const { data: todayWorkout, loading: loadingWorkout, error: workoutError, refresh: refreshWorkout } = useTodayWorkout();
   const { profile } = useProfile();
-  
+
   const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
@@ -155,7 +155,7 @@ export default function DashboardScreen() {
         }
       }
     } catch (err) {
-      console.error('[DashboardScreen] Failed to fetch week days:', err);
+      console.error('[WorkoutHomeScreen] Failed to fetch week days:', err);
     } finally {
       setLoadingWeek(false);
     }
@@ -234,7 +234,7 @@ export default function DashboardScreen() {
       <Background />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        
+
         {/* Top Mini Header (My Plan) */}
         <View style={styles.miniHeader}>
           <TouchableOpacity style={styles.planSelector} onPress={() => navigation.navigate('PlanDetails')}>
@@ -265,10 +265,10 @@ export default function DashboardScreen() {
               {/* Exercise List */}
               <View style={styles.listContainer}>
                 {exercises.map((ex, idx) => (
-                  <ExerciseCard 
-                    key={ex.id} 
-                    exercise={ex} 
-                    index={idx} 
+                  <ExerciseCard
+                    key={ex.id}
+                    exercise={ex}
+                    index={idx}
                     isLast={idx === exercises.length - 1}
                     isFocus={idx === 0}
                     onMenuPress={() => {
@@ -290,7 +290,7 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.emptyContainer}>
                {renderHeader(true)}
-               
+
                {dashState === 'no-program' ? (
                  <View style={styles.emptyStateCard}>
                    <View style={styles.emptyIconCircle}>
@@ -300,8 +300,8 @@ export default function DashboardScreen() {
                    <Text style={styles.emptyStateSub}>
                      You haven't assigned a program yet. Generate your protocol to start training.
                    </Text>
-                   <TouchableOpacity 
-                     style={styles.primaryBtn} 
+                   <TouchableOpacity
+                     style={styles.primaryBtn}
                      onPress={() => navigation.navigate('Onboarding' as never)}
                    >
                      <Text style={styles.primaryBtnText}>GET STARTED</Text>
@@ -316,7 +316,7 @@ export default function DashboardScreen() {
                    <Text style={styles.emptyStateSub}>
                      Rest is where the growth happens. Use today to focus on nutrition and mobility.
                    </Text>
-                   <TouchableOpacity 
+                   <TouchableOpacity
                      style={[styles.primaryBtn, { backgroundColor: colors.surfaceElevated }]}
                      onPress={() => navigation.navigate('Log' as never)}
                    >
@@ -333,8 +333,8 @@ export default function DashboardScreen() {
         {/* Sticky Start Button */}
         {dashState === 'ready' && (
           <View style={styles.stickyFooter}>
-            <TouchableOpacity 
-              style={styles.startBtn} 
+            <TouchableOpacity
+              style={styles.startBtn}
               onPress={() => navigation.navigate('Workout' as never)}
               activeOpacity={0.9}
             >
@@ -346,35 +346,35 @@ export default function DashboardScreen() {
 
       {/* Workout Menu Modal */}
       <Modal visible={workoutMenuVisible} transparent animationType="slide">
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setWorkoutMenuVisible(false)}
         >
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Workout Options</Text>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="bookmark-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>Save workout</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="repeat-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>Build superset/circuit</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="share-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>Share workout link</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.sheetAction} onPress={() => { setWorkoutMenuVisible(false); refreshWorkout(); }}>
               <Ionicons name="refresh-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>Refresh workout</Text>
             </TouchableOpacity>
-            
+
             <View style={{ height: 40 }} />
           </View>
         </TouchableOpacity>
@@ -382,30 +382,30 @@ export default function DashboardScreen() {
 
       {/* Exercise Menu Modal */}
       <Modal visible={menuVisible} transparent animationType="slide">
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>{selectedExercise?.exercise?.name}</Text>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="information-circle-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>View Exercise Details</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="swap-horizontal-outline" size={24} color="#fff" />
               <Text style={styles.sheetActionText}>Replace Exercise</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.sheetAction}>
               <Ionicons name="trash-outline" size={24} color={colors.danger} />
               <Text style={[styles.sheetActionText, { color: colors.danger }]}>Remove from Workout</Text>
             </TouchableOpacity>
-            
+
             <View style={{ height: 40 }} />
           </View>
         </TouchableOpacity>
@@ -418,21 +418,21 @@ export default function DashboardScreen() {
         splitDays={currentWeekDays}
         onSelectDay={async (day) => {
           console.log('[Swap] Option tapped:', day.id);
-          
+
           // 1. Close the swap sheet first
           setShowSwapSheet(false);
-          
+
           // 2. Wait a small gap to let the first modal start its dismissal.
           // This prevents modal mount/unmount conflicts in React Native.
           await new Promise(resolve => setTimeout(resolve, 200));
-          
+
           console.log('[Swap] Loading state ON');
           setIsGenerating(true);
-          
+
           // 3. Mandatory delay for premium feel
           console.log('[Swap] Workout update starting');
           await new Promise(resolve => setTimeout(resolve, 1200));
-          
+
           try {
             await refreshWorkout();
             console.log('[Swap] Workout update complete');

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Alert } from 'react-native';
 import { login as apiLogin, register as apiRegister, logout as apiLogout, loadToken, setUnauthorizedHandler } from '../lib/api';
 import api from '../lib/api';
+import { CONFIG } from '../constants/config';
 import type { AuthUser } from '../types/api';
 
 export type { AuthUser };
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Register global unauthorized handler — fires when any API call returns 401/403
   useEffect(() => {
     setUnauthorizedHandler(async () => {
-      if (require('../constants/config').CONFIG.DEV_MODE) {
+      if (CONFIG.DEV_MODE) {
         console.warn('[AuthContext] Session expired (DEV_MODE) — bypassing force-logout');
         return;
       }
@@ -59,6 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Restore session on app start
   useEffect(() => {
     async function restore() {
+      // In dev mode, skip restore so the RootNavigator dev bypass handles login
+      if (CONFIG.DEV_MODE) {
+        console.log('[AuthContext] restore() — DEV_MODE active, skipping session restore');
+        setLoading(false);
+        return;
+      }
       try {
         const token = await loadToken();
         console.log('[AuthContext] restore() — token found:', !!token);

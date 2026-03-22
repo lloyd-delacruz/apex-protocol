@@ -201,7 +201,7 @@ export default function LoginScreen() {
                 onPress={loginDev}
                 activeOpacity={0.7}
               >
-                <Text style={styles.bypassBtnText}>Skip to Dashboard (Dev Mode)</Text>
+                <Text style={styles.bypassBtnText}>Skip to Workout (Dev Mode)</Text>
               </TouchableOpacity>
             )}
           </View>

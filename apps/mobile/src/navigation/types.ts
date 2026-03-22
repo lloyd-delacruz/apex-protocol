@@ -32,12 +32,10 @@ export type OnboardingStackNavProp =
   NativeStackNavigationProp<OnboardingStackParamList>;
 
 // ─── Main Tab Navigator ───────────────────────────────────────────────────────
-// 5 tabs: Dashboard · Workout · Progress · Body · Log
-// Targets is a stack screen nested inside the Body tab (via BodyNavigator)
+// 4 tabs: Workout · Body · Progress · Log
 
 export type MainTabParamList = {
-  Dashboard: undefined; // Workout Prep
-  Workout: NavigatorScreenParams<SessionStackParamList>; // Active Session
+  Workout: undefined;   // Workout Overview (nested WorkoutStackParamList)
   Progress: undefined;  // Targets
   Body: undefined;      // Body & Measurements
   Log: undefined;       // History
@@ -47,20 +45,14 @@ export type MainTabNavProp = BottomTabNavigationProp<MainTabParamList>;
 
 // ─── Nested Stack Navigators ─────────────────────────────────────────────────
 
-export type DashboardStackParamList = {
-  DashboardMain: undefined;
+export type WorkoutStackParamList = {
+  WorkoutMain: undefined;
   PlanDetails: undefined;
 };
 
 export type SessionStackParamList = {
   WorkoutMain: undefined;
   ExerciseSelection: undefined;
-};
-
-export type WorkoutStackParamList = {
-  Workout: undefined;
-  Log: undefined;
-  ExerciseDetail: { exerciseId: string };
 };
 
 export type ProgressStackParamList = {

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { API_BASE_URL } from '../lib/api';
 import { useAuth } from './AuthContext';
+import { CONFIG } from '../constants/config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     async function loadState() {
       try {
+        if (CONFIG.DEV_MODE) {
+          console.log('[OnboardingContext] DEV_MODE: Resetting state to start fresh');
+          setState(INITIAL_STATE);
+          // In dev mode, we want a clean start every single time
+          await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
+          return;
+        }
         const saved = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
         if (saved) {
           setState(JSON.parse(saved));

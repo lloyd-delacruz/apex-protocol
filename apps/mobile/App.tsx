@@ -43,6 +43,8 @@ export default function App() {
   }
 
   return (
+    // Dark root view prevents white flash before NavigationContainer theme is applied
+    <View style={styles.darkRoot}>
     <SafeAreaProvider>
       <AuthProvider>
         <OnboardingProvider>
@@ -65,5 +67,13 @@ export default function App() {
         </OnboardingProvider>
       </AuthProvider>
     </SafeAreaProvider>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  darkRoot: {
+    flex: 1,
+    backgroundColor: '#06060A',
+  },
+});

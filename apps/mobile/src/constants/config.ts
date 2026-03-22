@@ -6,9 +6,9 @@
  */
 
 export const CONFIG = {
-  // Set to true to bypass login + onboarding during development
-  // Does nothing in production builds
-  DEV_MODE: false,
+  // Set to true to auto-login during development (skips session restore so
+  // onboarding always runs). Set back to false before any production build.
+  DEV_MODE: true,
 
   // Backend port used for auto-detection from Expo host
   API_PORT: 4001,
