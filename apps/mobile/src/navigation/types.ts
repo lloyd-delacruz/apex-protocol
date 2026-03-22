@@ -16,6 +16,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 // ─── Auth Stack ───────────────────────────────────────────────────────────────
 
 export type AuthStackParamList = {
+  Landing: undefined;
   Login: undefined;
 };
 
